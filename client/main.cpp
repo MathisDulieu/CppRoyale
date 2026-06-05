@@ -1,14 +1,14 @@
 #include "GameClient.hpp"
 #include "Renderer.hpp"
 #include "Constants.hpp"
-#include <string>
 
 int main() {
     GameClient client;
-    Renderer   renderer;
+    Renderer renderer;
 
     bool connected = client.connect("127.0.0.1", SERVER_PORT);
-    std::string status = connected ? "Connected to server!" : "Connection failed";
+    if (!connected)
+        return 1;
 
     sf::Clock pingClock;
 
@@ -18,15 +18,22 @@ int main() {
                 return 0;
         }
 
-        if (connected && pingClock.getElapsedTime().asSeconds() > 1.f) {
+        client.receivePackets();
+
+        if (pingClock.getElapsedTime().asSeconds() > 1.f) {
             client.sendPing();
             pingClock.restart();
         }
 
-        if (client.receivePong())
-            status = "Connected to server!  [PONG received]";
+        bool gameStarted = (client.getState() == ClientState::Playing);
+        uint8_t playerId = client.getPlayerId();
 
-        renderer.render(status);
+        std::string statusText = gameStarted
+                                     ? "Game started"
+                                     : "Waiting for players...";
+
+        renderer.render(statusText, gameStarted, playerId);
     }
+
     return 0;
 }

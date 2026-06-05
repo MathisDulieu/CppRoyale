@@ -1,0 +1,8 @@
+build/
+.idea/
+cmake-build-*/
+*.exe
+*.o
+*.obj
+*.a
+*.lib

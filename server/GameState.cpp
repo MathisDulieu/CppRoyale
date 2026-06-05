@@ -1,6 +1,7 @@
 #include "GameState.hpp"
-
+#include "Constants.hpp"
 #include <algorithm>
+#include <cmath>
 
 GameState::GameState()
     : m_tick(0)
@@ -19,21 +20,48 @@ void GameState::spawnTroop(TroopType troopType,
 }
 
 void GameState::update() {
+    moveEntities();
+    removeDeadEntities();
+    ++m_tick;
+}
+
+void GameState::moveEntities() {
+    for (auto &entity: m_entities) {
+        float targetY = (entity->getOwnerId() == 0)
+                            ? ARENA_HEIGHT
+                            : 0.f;
+
+        float directionX = 0.f;
+        float directionY = targetY - entity->getY();
+
+        float length = std::abs(directionY);
+        if (length > 0.f)
+            directionY /= length;
+
+        float distancePerTick = entity->getSpeed() * TICK_DURATION;
+        entity->move(directionX * distancePerTick,
+                     directionY * distancePerTick);
+    }
+}
+
+void GameState::removeDeadEntities() {
     m_entities.erase(
         std::remove_if(m_entities.begin(), m_entities.end(),
                        [](const std::unique_ptr<Entity> &entity) {
-                           return !entity->isAlive();
+                           if (!entity->isAlive()) return true;
+                           if (entity->getY() < 0.f) return true;
+                           if (entity->getY() > ARENA_HEIGHT) return true;
+                           return false;
                        }),
         m_entities.end()
     );
-    ++m_tick;
 }
 
 uint16_t GameState::getNextEntityId() {
     return m_nextEntityId++;
 }
 
-uint16_t GameState::getBaseHp(const TroopType troopType) {
+uint16_t GameState::getBaseHp(TroopType troopType) const {
     switch (troopType) {
         case TroopType::Goblin: return 150;
         case TroopType::Giant: return 800;

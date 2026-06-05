@@ -11,21 +11,27 @@ public:
            uint16_t maxHp,
            uint8_t ownerId);
 
-    [[nodiscard]] uint16_t getEntityId() const { return m_entityId; }
-    [[nodiscard]] TroopType getTroopType() const { return m_troopType; }
-    [[nodiscard]] float getX() const { return m_x; }
-    [[nodiscard]] float getY() const { return m_y; }
-    [[nodiscard]] uint16_t getHp() const { return m_hp; }
-    [[nodiscard]] uint8_t getOwnerId() const { return m_ownerId; }
-    [[nodiscard]] bool isAlive() const { return m_hp > 0; }
+    uint16_t getEntityId() const { return m_entityId; }
+    TroopType getTroopType() const { return m_troopType; }
+    float getX() const { return m_x; }
+    float getY() const { return m_y; }
+    uint16_t getHp() const { return m_hp; }
+    uint8_t getOwnerId() const { return m_ownerId; }
+    bool isAlive() const { return m_hp > 0; }
+    float getSpeed() const { return m_speed; }
 
     void setPosition(float x, float y);
 
+    void move(float deltaX, float deltaY);
+
 private:
+    float getBaseSpeed(TroopType troopType) const;
+
     uint16_t m_entityId;
     TroopType m_troopType;
     float m_x;
     float m_y;
     uint16_t m_hp;
     uint8_t m_ownerId;
+    float m_speed;
 };

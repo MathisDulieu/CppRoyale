@@ -20,10 +20,9 @@ int main() {
                 const auto *mouseEvent =
                         event->getIf<sf::Event::MouseButtonPressed>();
                 if (!mouseEvent) continue;
+                if (client.getState() == ClientState::GameOver) continue;
 
                 sf::Vector2i mousePosition = mouseEvent->position;
-
-                if (client.getState() == ClientState::GameOver) continue;
 
                 TroopType clickedTroop;
                 if (renderer.isTroopCardClicked(mousePosition, clickedTroop)) {
@@ -47,10 +46,12 @@ int main() {
         bool gameOver = (client.getState() == ClientState::GameOver);
         uint8_t playerId = client.getPlayerId();
         uint8_t winnerId = client.getWinnerId();
+        float elixir = client.getElixir();
 
         renderer.render(client.getEntities(), client.getTowers(),
                         gameStarted, gameOver,
-                        playerId, winnerId, selectedTroop);
+                        playerId, winnerId,
+                        selectedTroop, elixir);
     }
 
     return 0;

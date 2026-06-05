@@ -25,7 +25,8 @@ public:
                 bool gameOver,
                 uint8_t localPlayerId,
                 uint8_t winnerId,
-                TroopType selectedTroop);
+                TroopType selectedTroop,
+                float elixir);
 
     bool isTroopCardClicked(const sf::Vector2i &mousePosition,
                             TroopType &outTroopType) const;
@@ -45,7 +46,9 @@ private:
 
     void drawHpBar(const EntitySnapshot &snapshot, float renderY);
 
-    void drawTroopPanel(TroopType selectedTroop);
+    void drawTroopPanel(TroopType selectedTroop, float elixir);
+
+    void drawElixirBar(float elixir);
 
     void drawWaitingScreen();
 
@@ -59,13 +62,15 @@ private:
     sf::Color getTowerColor(bool isNexus, uint8_t ownerId,
                             uint8_t localPlayerId) const;
 
-    sf::Color getTroopCardColor(TroopType troopType) const;
+    sf::Color getTroopCardColor(TroopType troopType, bool affordable) const;
 
     std::string getTroopName(TroopType troopType) const;
 
     sf::FloatRect getTroopCardBounds(int cardIndex) const;
 
     uint16_t getTroopMaxHp(TroopType troopType) const;
+
+    uint8_t getTroopCost(TroopType troopType) const;
 
     sf::RenderWindow m_window;
     sf::Font m_font;

@@ -35,9 +35,13 @@ void GameClient::receivePackets() {
             std::cout << "[Client] Game started — player " << (int) m_playerId << "\n";
         } else if (packetType == PKT_GAME_STATE) {
             uint32_t tick;
-            uint16_t entityCount;
-            packet >> tick >> entityCount;
+            packet >> tick;
 
+            for (uint8_t playerId = 0; playerId < MAX_PLAYERS; ++playerId)
+                packet >> m_elixir[playerId];
+
+            uint16_t entityCount;
+            packet >> entityCount;
             m_entities.clear();
             for (uint16_t index = 0; index < entityCount; ++index) {
                 EntitySnapshot snapshot;

@@ -113,6 +113,9 @@ void GameServer::broadcastGameState() {
     packet << PKT_GAME_STATE;
     packet << m_gameState.getTick();
 
+    for (uint8_t playerId = 0; playerId < MAX_PLAYERS; ++playerId)
+        packet << m_gameState.getElixir(playerId);
+
     packet << static_cast<uint16_t>(entities.size());
     for (const auto &entity: entities) {
         packet << entity->getEntityId()

@@ -1,6 +1,7 @@
 #include "Renderer.hpp"
 #include "Constants.hpp"
 #include <cmath>
+#include <string>
 
 Renderer::Renderer()
     : m_window(sf::VideoMode({800, 680}), "CppRoyale")
@@ -22,7 +23,8 @@ void Renderer::render(const std::vector<EntitySnapshot> &entities,
                       bool gameOver,
                       uint8_t localPlayerId,
                       uint8_t winnerId,
-                      TroopType selectedTroop) {
+                      TroopType selectedTroop,
+                      float elixir) {
     m_window.clear(sf::Color(20, 20, 30));
 
     if (!gameStarted) {
@@ -35,8 +37,10 @@ void Renderer::render(const std::vector<EntitySnapshot> &entities,
     drawTowers(towers, localPlayerId);
     drawEntities(entities, localPlayerId);
 
-    if (!gameOver)
-        drawTroopPanel(selectedTroop);
+    if (!gameOver) {
+        drawTroopPanel(selectedTroop, elixir);
+        drawElixirBar(elixir);
+    }
 
     if (gameOver)
         drawGameOverScreen(winnerId == localPlayerId);
@@ -55,7 +59,6 @@ void Renderer::drawTowers(const std::vector<TowerSnapshot> &towers,
                           uint8_t localPlayerId) {
     for (const auto &snapshot: towers) {
         float renderY = getRenderY(snapshot.y, localPlayerId);
-
         float size = snapshot.isNexus ? 50.f : 36.f;
 
         sf::RectangleShape towerShape(sf::Vector2f(size, size));
@@ -67,7 +70,6 @@ void Renderer::drawTowers(const std::vector<TowerSnapshot> &towers,
         towerShape.setOutlineThickness(2.f);
         towerShape.setOutlineColor(sf::Color(200, 200, 200));
         m_window.draw(towerShape);
-
         drawTowerHpBar(snapshot, renderY);
     }
 }
@@ -125,7 +127,35 @@ void Renderer::drawHpBar(const EntitySnapshot &snapshot, float renderY) {
     m_window.draw(fill);
 }
 
-void Renderer::drawTroopPanel(TroopType selectedTroop) {
+void Renderer::drawElixirBar(float elixir) {
+    float barTotalWidth = 300.f;
+    float barHeight = 20.f;
+    float startX = (800.f - barTotalWidth) / 2.f;
+    float startY = 572.f;
+    float fillRatio = elixir / MAX_ELIXIR;
+
+    sf::RectangleShape background(sf::Vector2f(barTotalWidth, barHeight));
+    background.setPosition({startX, startY});
+    background.setFillColor(sf::Color(40, 10, 60));
+    m_window.draw(background);
+
+    sf::RectangleShape fill(sf::Vector2f(barTotalWidth * fillRatio, barHeight));
+    fill.setPosition({startX, startY});
+    fill.setFillColor(sf::Color(160, 40, 220));
+    m_window.draw(fill);
+
+    if (m_fontLoaded) {
+        std::string elixirText = std::to_string(static_cast<int>(elixir))
+                                 + " / "
+                                 + std::to_string(static_cast<int>(MAX_ELIXIR));
+        sf::Text label(m_font, elixirText, 13);
+        label.setFillColor(sf::Color::White);
+        label.setPosition({startX + barTotalWidth / 2.f - 20.f, startY + 2.f});
+        m_window.draw(label);
+    }
+}
+
+void Renderer::drawTroopPanel(TroopType selectedTroop, float elixir) {
     sf::RectangleShape panel(sf::Vector2f(800.f, UI_PANEL_HEIGHT));
     panel.setPosition({0.f, 600.f});
     panel.setFillColor(sf::Color(30, 30, 45));
@@ -135,10 +165,11 @@ void Renderer::drawTroopPanel(TroopType selectedTroop) {
         TroopType troopType = static_cast<TroopType>(index);
         sf::FloatRect bounds = getTroopCardBounds(index);
         bool isSelected = (troopType == selectedTroop);
+        bool affordable = (elixir >= static_cast<float>(getTroopCost(troopType)));
 
         sf::RectangleShape card(sf::Vector2f(bounds.size.x, bounds.size.y));
         card.setPosition({bounds.position.x, bounds.position.y});
-        card.setFillColor(getTroopCardColor(troopType));
+        card.setFillColor(getTroopCardColor(troopType, affordable));
         card.setOutlineThickness(isSelected ? 3.f : 1.f);
         card.setOutlineColor(isSelected
                                  ? sf::Color(255, 220, 50)
@@ -146,13 +177,23 @@ void Renderer::drawTroopPanel(TroopType selectedTroop) {
         m_window.draw(card);
 
         if (m_fontLoaded) {
-            sf::Text label(m_font, getTroopName(troopType), 9);
-            label.setFillColor(sf::Color::White);
-            label.setPosition({
+            sf::Text nameLabel(m_font, getTroopName(troopType), 9);
+            nameLabel.setFillColor(sf::Color::White);
+            nameLabel.setPosition({
                 bounds.position.x + 4.f,
-                bounds.position.y + 42.f
+                bounds.position.y + 40.f
             });
-            m_window.draw(label);
+            m_window.draw(nameLabel);
+
+            sf::Text costLabel(m_font,
+                               std::to_string(getTroopCost(troopType)),
+                               14);
+            costLabel.setFillColor(sf::Color(200, 100, 255));
+            costLabel.setPosition({
+                bounds.position.x + 4.f,
+                bounds.position.y + 4.f
+            });
+            m_window.draw(costLabel);
         }
     }
 }
@@ -209,7 +250,10 @@ sf::Color Renderer::getTowerColor(bool isNexus,
     return isAlly ? sf::Color(40, 140, 180) : sf::Color(180, 80, 40);
 }
 
-sf::Color Renderer::getTroopCardColor(TroopType troopType) const {
+sf::Color Renderer::getTroopCardColor(TroopType troopType, bool affordable) const {
+    if (!affordable)
+        return sf::Color(50, 50, 50);
+
     switch (troopType) {
         case TroopType::Goblin: return sf::Color(60, 140, 60);
         case TroopType::Giant: return sf::Color(100, 80, 160);
@@ -259,6 +303,20 @@ uint16_t Renderer::getTroopMaxHp(TroopType troopType) const {
         case TroopType::Golem: return 1200;
         case TroopType::Wizard: return 300;
         default: return 100;
+    }
+}
+
+uint8_t Renderer::getTroopCost(TroopType troopType) const {
+    switch (troopType) {
+        case TroopType::Goblin: return 2;
+        case TroopType::Giant: return 5;
+        case TroopType::Archer: return 3;
+        case TroopType::Knight: return 3;
+        case TroopType::Bomber: return 4;
+        case TroopType::Dragon: return 4;
+        case TroopType::Golem: return 8;
+        case TroopType::Wizard: return 5;
+        default: return 3;
     }
 }
 

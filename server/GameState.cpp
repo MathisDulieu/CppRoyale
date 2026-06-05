@@ -2,6 +2,7 @@
 #include "Constants.hpp"
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 GameState::GameState()
     : m_tick(0)
@@ -20,27 +21,63 @@ void GameState::spawnTroop(TroopType troopType,
 }
 
 void GameState::update() {
+    resolveCombat();
     moveEntities();
     removeDeadEntities();
     ++m_tick;
 }
 
+void GameState::resolveCombat() {
+    for (auto &attacker: m_entities) {
+        attacker->setInCombat(false);
+        attacker->reduceCooldown(TICK_DURATION);
+    }
+
+    for (auto &attacker: m_entities) {
+        if (!attacker->isAlive()) continue;
+
+        Entity *closestEnemy = nullptr;
+        float closestDistance = std::numeric_limits<float>::max();
+
+        for (auto &target: m_entities) {
+            if (!target->isAlive()) continue;
+            if (target->getOwnerId() == attacker->getOwnerId()) continue;
+
+            float distance = distanceBetween(*attacker, *target);
+            if (distance < closestDistance) {
+                closestDistance = distance;
+                closestEnemy = target.get();
+            }
+        }
+
+        if (closestEnemy == nullptr) continue;
+        if (closestDistance > attacker->getAttackRange()) continue;
+
+        attacker->setInCombat(true);
+
+        if (attacker->getCooldownTimer() <= 0.f) {
+            closestEnemy->takeDamage(attacker->getAttackDamage());
+            attacker->resetCooldown();
+        }
+    }
+}
+
 void GameState::moveEntities() {
     for (auto &entity: m_entities) {
+        if (entity->isInCombat()) continue;
+
         float targetY = (entity->getOwnerId() == 0)
                             ? ARENA_HEIGHT
                             : 0.f;
 
-        float directionX = 0.f;
         float directionY = targetY - entity->getY();
-
         float length = std::abs(directionY);
+
         if (length > 0.f)
             directionY /= length;
 
         float distancePerTick = entity->getSpeed() * TICK_DURATION;
-        entity->move(directionX * distancePerTick,
-                     directionY * distancePerTick);
+        entity->move(0.f, directionY * distancePerTick);
     }
 }
 
@@ -55,6 +92,13 @@ void GameState::removeDeadEntities() {
                        }),
         m_entities.end()
     );
+}
+
+float GameState::distanceBetween(const Entity &first,
+                                 const Entity &second) const {
+    float deltaX = first.getX() - second.getX();
+    float deltaY = first.getY() - second.getY();
+    return std::sqrt(deltaX * deltaX + deltaY * deltaY);
 }
 
 uint16_t GameState::getNextEntityId() {

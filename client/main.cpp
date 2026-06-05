@@ -9,27 +9,43 @@ int main() {
     if (!client.connect("127.0.0.1", SERVER_PORT))
         return 1;
 
+    TroopType selectedTroop = TroopType::Knight;
+
     while (renderer.isOpen()) {
-        while (const auto event = renderer.pollEvent()) {
+        while (auto event = renderer.pollEvent()) {
             if (event->is<sf::Event::Closed>())
                 return 0;
 
             if (event->is<sf::Event::MouseButtonPressed>()) {
-                const auto &mouseEvent = event->getIf<sf::Event::MouseButtonPressed>();
-                if (mouseEvent && client.getState() == ClientState::Playing) {
-                    const auto clickX = static_cast<float>(mouseEvent->position.x);
-                    const auto clickY = static_cast<float>(mouseEvent->position.y);
-                    client.deployTroop(TroopType::Knight, clickX, clickY);
+                const auto *mouseEvent =
+                        event->getIf<sf::Event::MouseButtonPressed>();
+                if (!mouseEvent) continue;
+
+                sf::Vector2i mousePosition = mouseEvent->position;
+
+                TroopType clickedTroop;
+                if (renderer.isTroopCardClicked(mousePosition, clickedTroop)) {
+                    selectedTroop = clickedTroop;
+                } else if (renderer.isArenaClicked(mousePosition)
+                           && client.getState() == ClientState::Playing) {
+                    float clickX = static_cast<float>(mousePosition.x);
+                    float clickY = static_cast<float>(mousePosition.y);
+
+                    if (client.getPlayerId() == 0)
+                        clickY = ARENA_HEIGHT - 1.f - clickY;
+
+                    client.deployTroop(selectedTroop, clickX, clickY);
                 }
             }
         }
 
         client.receivePackets();
 
-        const bool gameStarted = (client.getState() == ClientState::Playing);
-        const uint8_t playerId = client.getPlayerId();
+        bool gameStarted = (client.getState() == ClientState::Playing);
+        uint8_t playerId = client.getPlayerId();
 
-        renderer.render(client.getEntities(), gameStarted, playerId);
+        renderer.render(client.getEntities(), gameStarted,
+                        playerId, selectedTroop);
     }
 
     return 0;

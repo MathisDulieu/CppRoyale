@@ -23,7 +23,11 @@ private:
 
     void moveEntities();
 
+    void resolveCombat();
+
     void removeDeadEntities();
+
+    float distanceBetween(const Entity &first, const Entity &second) const;
 
     std::vector<std::unique_ptr<Entity> > m_entities;
     uint32_t m_tick;

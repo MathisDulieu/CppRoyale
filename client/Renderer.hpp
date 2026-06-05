@@ -1,8 +1,9 @@
 #pragma once
 #include <SFML/Graphics.hpp>
-#include <string>
+#include <vector>
 #include <optional>
 #include <cstdint>
+#include "Packets.hpp"
 
 class Renderer {
 public:
@@ -12,10 +13,13 @@ public:
 
     std::optional<sf::Event> pollEvent();
 
-    void render(const std::string &statusText,
+    void render(const std::vector<EntitySnapshot> &entities,
                 bool gameStarted,
-                uint8_t playerId);
+                uint8_t localPlayerId);
 
 private:
+    static sf::Color getTroopColor(TroopType troopType, uint8_t ownerId,
+                                   uint8_t localPlayerId);
+
     sf::RenderWindow m_window;
 };

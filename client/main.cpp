@@ -6,33 +6,30 @@ int main() {
     GameClient client;
     Renderer renderer;
 
-    bool connected = client.connect("127.0.0.1", SERVER_PORT);
-    if (!connected)
+    if (!client.connect("127.0.0.1", SERVER_PORT))
         return 1;
 
-    sf::Clock pingClock;
-
     while (renderer.isOpen()) {
-        while (auto event = renderer.pollEvent()) {
+        while (const auto event = renderer.pollEvent()) {
             if (event->is<sf::Event::Closed>())
                 return 0;
+
+            if (event->is<sf::Event::MouseButtonPressed>()) {
+                const auto &mouseEvent = event->getIf<sf::Event::MouseButtonPressed>();
+                if (mouseEvent && client.getState() == ClientState::Playing) {
+                    const auto clickX = static_cast<float>(mouseEvent->position.x);
+                    const auto clickY = static_cast<float>(mouseEvent->position.y);
+                    client.deployTroop(TroopType::Knight, clickX, clickY);
+                }
+            }
         }
 
         client.receivePackets();
 
-        if (pingClock.getElapsedTime().asSeconds() > 1.f) {
-            client.sendPing();
-            pingClock.restart();
-        }
+        const bool gameStarted = (client.getState() == ClientState::Playing);
+        const uint8_t playerId = client.getPlayerId();
 
-        bool gameStarted = (client.getState() == ClientState::Playing);
-        uint8_t playerId = client.getPlayerId();
-
-        std::string statusText = gameStarted
-                                     ? "Game started"
-                                     : "Waiting for players...";
-
-        renderer.render(statusText, gameStarted, playerId);
+        renderer.render(client.getEntities(), gameStarted, playerId);
     }
 
     return 0;

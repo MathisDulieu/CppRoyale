@@ -12,6 +12,8 @@ include_directories(shared)
 add_executable(server
         server/main.cpp
         server/GameServer.cpp
+        server/GameState.cpp
+        server/Entity.cpp
 )
 target_link_libraries(server SFML::Network SFML::System)
 

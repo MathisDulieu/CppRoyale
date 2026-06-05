@@ -23,6 +23,8 @@ int main() {
 
                 sf::Vector2i mousePosition = mouseEvent->position;
 
+                if (client.getState() == ClientState::GameOver) continue;
+
                 TroopType clickedTroop;
                 if (renderer.isTroopCardClicked(mousePosition, clickedTroop)) {
                     selectedTroop = clickedTroop;
@@ -41,11 +43,14 @@ int main() {
 
         client.receivePackets();
 
-        bool gameStarted = (client.getState() == ClientState::Playing);
+        bool gameStarted = (client.getState() != ClientState::Waiting);
+        bool gameOver = (client.getState() == ClientState::GameOver);
         uint8_t playerId = client.getPlayerId();
+        uint8_t winnerId = client.getWinnerId();
 
-        renderer.render(client.getEntities(), gameStarted,
-                        playerId, selectedTroop);
+        renderer.render(client.getEntities(), client.getTowers(),
+                        gameStarted, gameOver,
+                        playerId, winnerId, selectedTroop);
     }
 
     return 0;

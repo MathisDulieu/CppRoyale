@@ -6,24 +6,48 @@
 
 GameState::GameState()
     : m_tick(0)
-      , m_nextEntityId(1) {
+      , m_nextEntityId(1)
+      , m_result(GameResult::Ongoing) {
+    initTowers();
+}
+
+void GameState::initTowers() {
+    m_towers.emplace_back(0, 150.f, 60.f, 1200, 0, false);
+    m_towers.emplace_back(1, 650.f, 60.f, 1200, 0, false);
+    m_towers.emplace_back(2, 400.f, 60.f, 2000, 0, true);
+
+    m_towers.emplace_back(3, 150.f, 540.f, 1200, 1, false);
+    m_towers.emplace_back(4, 650.f, 540.f, 1200, 1, false);
+    m_towers.emplace_back(5, 400.f, 540.f, 2000, 1, true);
 }
 
 void GameState::spawnTroop(TroopType troopType,
                            float x,
                            float y,
                            uint8_t ownerId) {
-    uint16_t hp = getBaseHp(troopType);
-    uint16_t entityId = getNextEntityId();
-    m_entities.push_back(
-        std::make_unique<Entity>(entityId, troopType, x, y, hp, ownerId)
-    );
+    m_entities.push_back(std::make_unique<Entity>(
+        getNextEntityId(), troopType, x, y, getBaseHp(troopType), ownerId
+    ));
 }
 
 void GameState::update() {
+    if (m_result != GameResult::Ongoing) return;
+
     resolveCombat();
+    resolveTowerCombat();
     moveEntities();
-    removeDeadEntities();
+
+    m_entities.erase(
+        std::remove_if(m_entities.begin(), m_entities.end(),
+                       [](const std::unique_ptr<Entity> &entity) {
+                           return !entity->isAlive()
+                                  || entity->getY() < 0.f
+                                  || entity->getY() > ARENA_HEIGHT;
+                       }),
+        m_entities.end()
+    );
+
+    checkWinCondition();
     ++m_tick;
 }
 
@@ -43,21 +67,65 @@ void GameState::resolveCombat() {
             if (!target->isAlive()) continue;
             if (target->getOwnerId() == attacker->getOwnerId()) continue;
 
-            float distance = distanceBetween(*attacker, *target);
+            float distance = distanceBetween(attacker->getX(), attacker->getY(),
+                                             target->getX(), target->getY());
             if (distance < closestDistance) {
                 closestDistance = distance;
                 closestEnemy = target.get();
             }
         }
 
-        if (closestEnemy == nullptr) continue;
-        if (closestDistance > attacker->getAttackRange()) continue;
+        if (closestEnemy && closestDistance <= attacker->getAttackRange()) {
+            attacker->setInCombat(true);
+            if (attacker->getCooldownTimer() <= 0.f) {
+                closestEnemy->takeDamage(attacker->getAttackDamage());
+                attacker->resetCooldown();
+            }
+            continue;
+        }
 
-        attacker->setInCombat(true);
+        Tower *closestTower = findClosestEnemyTower(attacker->getX(),
+                                                    attacker->getY(),
+                                                    attacker->getOwnerId());
+        if (closestTower) {
+            float towerDistance = distanceBetween(attacker->getX(), attacker->getY(),
+                                                  closestTower->getX(), closestTower->getY());
+            if (towerDistance <= attacker->getAttackRange()) {
+                attacker->setInCombat(true);
+                if (attacker->getCooldownTimer() <= 0.f) {
+                    closestTower->takeDamage(attacker->getAttackDamage());
+                    attacker->resetCooldown();
+                }
+            }
+        }
+    }
+}
 
-        if (attacker->getCooldownTimer() <= 0.f) {
-            closestEnemy->takeDamage(attacker->getAttackDamage());
-            attacker->resetCooldown();
+void GameState::resolveTowerCombat() {
+    for (auto &tower: m_towers) {
+        if (!tower.isAlive()) continue;
+        tower.reduceCooldown(TICK_DURATION);
+
+        Entity *closestEnemy = nullptr;
+        float closestDistance = std::numeric_limits<float>::max();
+
+        for (auto &entity: m_entities) {
+            if (!entity->isAlive()) continue;
+            if (entity->getOwnerId() == tower.getOwnerId()) continue;
+
+            float distance = distanceBetween(tower.getX(), tower.getY(),
+                                             entity->getX(), entity->getY());
+            if (distance < closestDistance) {
+                closestDistance = distance;
+                closestEnemy = entity.get();
+            }
+        }
+
+        if (closestEnemy && closestDistance <= tower.getAttackRange()) {
+            if (tower.getCooldownTimer() <= 0.f) {
+                closestEnemy->takeDamage(tower.getAttackDamage());
+                tower.resetCooldown();
+            }
         }
     }
 }
@@ -66,38 +134,58 @@ void GameState::moveEntities() {
     for (auto &entity: m_entities) {
         if (entity->isInCombat()) continue;
 
-        float targetY = (entity->getOwnerId() == 0)
-                            ? ARENA_HEIGHT
-                            : 0.f;
+        Tower *targetTower = findClosestEnemyTower(entity->getX(),
+                                                   entity->getY(),
+                                                   entity->getOwnerId());
+        if (!targetTower) continue;
 
-        float directionY = targetY - entity->getY();
-        float length = std::abs(directionY);
+        float deltaX = targetTower->getX() - entity->getX();
+        float deltaY = targetTower->getY() - entity->getY();
+        float length = std::sqrt(deltaX * deltaX + deltaY * deltaY);
 
-        if (length > 0.f)
-            directionY /= length;
+        if (length <= 0.f) continue;
 
         float distancePerTick = entity->getSpeed() * TICK_DURATION;
-        entity->move(0.f, directionY * distancePerTick);
+        entity->move((deltaX / length) * distancePerTick,
+                     (deltaY / length) * distancePerTick);
     }
 }
 
-void GameState::removeDeadEntities() {
-    m_entities.erase(
-        std::remove_if(m_entities.begin(), m_entities.end(),
-                       [](const std::unique_ptr<Entity> &entity) {
-                           if (!entity->isAlive()) return true;
-                           if (entity->getY() < 0.f) return true;
-                           if (entity->getY() > ARENA_HEIGHT) return true;
-                           return false;
-                       }),
-        m_entities.end()
-    );
+void GameState::checkWinCondition() {
+    bool player0NexusAlive = false;
+    bool player1NexusAlive = false;
+
+    for (const auto &tower: m_towers) {
+        if (tower.isNexus() && tower.isAlive()) {
+            if (tower.getOwnerId() == 0) player0NexusAlive = true;
+            if (tower.getOwnerId() == 1) player1NexusAlive = true;
+        }
+    }
+
+    if (!player0NexusAlive) m_result = GameResult::Player1Wins;
+    if (!player1NexusAlive) m_result = GameResult::Player0Wins;
 }
 
-float GameState::distanceBetween(const Entity &first,
-                                 const Entity &second) const {
-    float deltaX = first.getX() - second.getX();
-    float deltaY = first.getY() - second.getY();
+Tower *GameState::findClosestEnemyTower(float x, float y, uint8_t ownerId) {
+    Tower *closest = nullptr;
+    float closestDistance = std::numeric_limits<float>::max();
+
+    for (auto &tower: m_towers) {
+        if (!tower.isAlive()) continue;
+        if (tower.getOwnerId() == ownerId) continue;
+
+        float distance = distanceBetween(x, y, tower.getX(), tower.getY());
+        if (distance < closestDistance) {
+            closestDistance = distance;
+            closest = &tower;
+        }
+    }
+    return closest;
+}
+
+float GameState::distanceBetween(float x1, float y1, float x2, float y2) const {
+    float deltaX = x1 - x2;
+    float deltaY = y1 - y2;
     return std::sqrt(deltaX * deltaX + deltaY * deltaY);
 }
 

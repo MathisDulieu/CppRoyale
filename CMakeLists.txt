@@ -14,6 +14,7 @@ add_executable(server
         server/GameServer.cpp
         server/GameState.cpp
         server/Entity.cpp
+        server/Tower.cpp
 )
 target_link_libraries(server SFML::Network SFML::System)
 

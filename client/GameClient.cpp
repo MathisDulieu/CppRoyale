@@ -1,16 +1,16 @@
 #include "GameClient.hpp"
 #include <iostream>
 
-bool GameClient::connect(const std::string &host, const unsigned short port) {
+bool GameClient::connect(const std::string &host, unsigned short port) {
     m_socket.setBlocking(false);
 
-    const auto address = sf::IpAddress::resolve(host);
+    auto address = sf::IpAddress::resolve(host);
     if (!address) {
         std::cerr << "[Client] Cannot resolve host\n";
         return false;
     }
 
-    const auto status = m_socket.connect(*address, port, sf::seconds(5));
+    auto status = m_socket.connect(*address, port, sf::seconds(5));
     if (status != sf::Socket::Status::Done &&
         status != sf::Socket::Status::NotReady) {
         std::cerr << "[Client] Connection failed\n";
@@ -31,10 +31,9 @@ void GameClient::receivePackets() {
             uint8_t assignedId;
             packet >> assignedId;
             m_playerId = assignedId;
-            m_state    = ClientState::Playing;
-            std::cout << "[Client] Game started — player " << (int)m_playerId << "\n";
-        }
-        else if (packetType == PKT_GAME_STATE) {
+            m_state = ClientState::Playing;
+            std::cout << "[Client] Game started — player " << (int) m_playerId << "\n";
+        } else if (packetType == PKT_GAME_STATE) {
             uint32_t tick;
             uint16_t entityCount;
             packet >> tick >> entityCount;
@@ -44,19 +43,41 @@ void GameClient::receivePackets() {
                 EntitySnapshot snapshot;
                 uint8_t troopTypeByte;
                 packet >> snapshot.entityId
-                       >> troopTypeByte
-                       >> snapshot.x
-                       >> snapshot.y
-                       >> snapshot.hp
-                       >> snapshot.ownerId;
+                        >> troopTypeByte
+                        >> snapshot.x
+                        >> snapshot.y
+                        >> snapshot.hp
+                        >> snapshot.ownerId;
                 snapshot.troopType = static_cast<TroopType>(troopTypeByte);
                 m_entities.push_back(snapshot);
             }
+
+            uint8_t towerCount;
+            packet >> towerCount;
+            m_towers.clear();
+            for (uint8_t index = 0; index < towerCount; ++index) {
+                TowerSnapshot snapshot;
+                uint8_t isNexusByte;
+                packet >> snapshot.towerId
+                        >> snapshot.x
+                        >> snapshot.y
+                        >> snapshot.hp
+                        >> snapshot.ownerId
+                        >> isNexusByte;
+                snapshot.isNexus = (isNexusByte == 1);
+                m_towers.push_back(snapshot);
+            }
+        } else if (packetType == PKT_GAME_OVER) {
+            uint8_t winnerId;
+            packet >> winnerId;
+            m_winnerId = winnerId;
+            m_state = ClientState::GameOver;
+            std::cout << "[Client] Game over — winner: player " << (int) winnerId << "\n";
         }
     }
 }
 
-void GameClient::deployTroop(TroopType troopType, const float x, const float y) {
+void GameClient::deployTroop(TroopType troopType, float x, float y) {
     sf::Packet packet;
     packet << PKT_DEPLOY
             << static_cast<uint8_t>(troopType)

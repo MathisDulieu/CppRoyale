@@ -20,8 +20,11 @@ public:
     std::optional<sf::Event> pollEvent();
 
     void render(const std::vector<EntitySnapshot> &entities,
+                const std::vector<TowerSnapshot> &towers,
                 bool gameStarted,
+                bool gameOver,
                 uint8_t localPlayerId,
+                uint8_t winnerId,
                 TroopType selectedTroop);
 
     bool isTroopCardClicked(const sf::Vector2i &mousePosition,
@@ -32,6 +35,11 @@ public:
 private:
     void drawArena();
 
+    void drawTowers(const std::vector<TowerSnapshot> &towers,
+                    uint8_t localPlayerId);
+
+    void drawTowerHpBar(const TowerSnapshot &snapshot, float renderY);
+
     void drawEntities(const std::vector<EntitySnapshot> &entities,
                       uint8_t localPlayerId);
 
@@ -41,7 +49,14 @@ private:
 
     void drawWaitingScreen();
 
+    void drawGameOverScreen(bool localPlayerWon);
+
+    float getRenderY(float serverY, uint8_t localPlayerId) const;
+
     sf::Color getTroopColor(TroopType troopType, uint8_t ownerId,
+                            uint8_t localPlayerId) const;
+
+    sf::Color getTowerColor(bool isNexus, uint8_t ownerId,
                             uint8_t localPlayerId) const;
 
     sf::Color getTroopCardColor(TroopType troopType) const;

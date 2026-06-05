@@ -6,7 +6,8 @@
 
 enum class ServerState {
     Waiting,
-    Playing
+    Playing,
+    GameOver
 };
 
 struct ClientSlot {
@@ -16,7 +17,7 @@ struct ClientSlot {
 
 class GameServer {
 public:
-    explicit GameServer(unsigned short port);
+    GameServer(unsigned short port);
 
     void run();
 
@@ -27,7 +28,9 @@ private:
 
     void broadcastStart();
 
-    void broadcastGameState() const;
+    void broadcastGameState();
+
+    void broadcastGameOver(uint8_t winnerPlayerId);
 
     void processDeployPacket(sf::Packet &packet, uint8_t playerId);
 
@@ -37,6 +40,6 @@ private:
     ServerState m_serverState;
     GameState m_gameState;
     bool m_running;
-    bool m_startPending = false;
-    int m_startPendingTicks = 0;
+    bool m_startPending;
+    int m_startPendingTicks;
 };

@@ -1,15 +1,17 @@
 #include "GameClient.hpp"
 #include "Renderer.hpp"
+#include "Deck.hpp"
 #include "Constants.hpp"
 
 int main() {
     GameClient client;
     Renderer renderer;
+    Deck deck;
 
     if (!client.connect("127.0.0.1", SERVER_PORT))
         return 1;
 
-    TroopType selectedTroop = TroopType::Knight;
+    int selectedHandIndex = 0;
 
     while (renderer.isOpen()) {
         while (auto event = renderer.pollEvent()) {
@@ -24,9 +26,9 @@ int main() {
 
                 sf::Vector2i mousePosition = mouseEvent->position;
 
-                TroopType clickedTroop;
-                if (renderer.isTroopCardClicked(mousePosition, clickedTroop)) {
-                    selectedTroop = clickedTroop;
+                int clickedHandIndex;
+                if (renderer.isHandCardClicked(mousePosition, clickedHandIndex)) {
+                    selectedHandIndex = clickedHandIndex;
                 } else if (renderer.isArenaClicked(mousePosition)
                            && client.getState() == ClientState::Playing) {
                     float clickX = static_cast<float>(mousePosition.x);
@@ -35,7 +37,22 @@ int main() {
                     if (client.getPlayerId() == 0)
                         clickY = ARENA_HEIGHT - 1.f - clickY;
 
-                    client.deployTroop(selectedTroop, clickX, clickY);
+                    TroopType selectedTroop = deck.getCard(selectedHandIndex);
+                    uint8_t cost = 0;
+
+                    if (selectedTroop == TroopType::Goblin) cost = 2;
+                    else if (selectedTroop == TroopType::Giant) cost = 5;
+                    else if (selectedTroop == TroopType::Archer) cost = 3;
+                    else if (selectedTroop == TroopType::Knight) cost = 3;
+                    else if (selectedTroop == TroopType::Bomber) cost = 4;
+                    else if (selectedTroop == TroopType::Dragon) cost = 4;
+                    else if (selectedTroop == TroopType::Golem) cost = 8;
+                    else if (selectedTroop == TroopType::Wizard) cost = 5;
+
+                    if (client.getElixir() >= static_cast<float>(cost)) {
+                        client.deployTroop(selectedTroop, clickX, clickY);
+                        deck.playCard(selectedHandIndex);
+                    }
                 }
             }
         }
@@ -53,8 +70,8 @@ int main() {
         renderer.render(client.getEntities(), client.getTowers(),
                         gameStarted, gameOver,
                         playerId, winnerId,
-                        selectedTroop, elixir,
-                        remainingTime, isOvertime);
+                        deck, selectedHandIndex,
+                        elixir, remainingTime, isOvertime);
     }
 
     return 0;

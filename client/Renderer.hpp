@@ -5,11 +5,13 @@
 #include <cstdint>
 #include "Packets.hpp"
 #include "TroopType.hpp"
+#include "Deck.hpp"
 
-constexpr int TROOP_COUNT = 8;
+constexpr int TROOP_COUNT = 4;
 constexpr float UI_PANEL_HEIGHT = 80.f;
 constexpr float TROOP_CARD_SIZE = 60.f;
 constexpr float TROOP_CARD_GAP = 10.f;
+constexpr float NEXT_CARD_SIZE = 44.f;
 
 class Renderer {
 public:
@@ -25,13 +27,14 @@ public:
                 bool gameOver,
                 uint8_t localPlayerId,
                 uint8_t winnerId,
-                TroopType selectedTroop,
+                const Deck &deck,
+                int selectedHandIndex,
                 float elixir,
                 float remainingTime,
                 bool isOvertime);
 
-    bool isTroopCardClicked(const sf::Vector2i &mousePosition,
-                            TroopType &outTroopType) const;
+    bool isHandCardClicked(const sf::Vector2i &mousePosition,
+                           int &outHandIndex) const;
 
     bool isArenaClicked(const sf::Vector2i &mousePosition) const;
 
@@ -48,7 +51,9 @@ private:
 
     void drawHpBar(const EntitySnapshot &snapshot, float renderY);
 
-    void drawTroopPanel(TroopType selectedTroop, float elixir);
+    void drawHandPanel(const Deck &deck, int selectedHandIndex, float elixir);
+
+    void drawNextCard(const Deck &deck);
 
     void drawElixirBar(float elixir);
 
@@ -70,7 +75,9 @@ private:
 
     std::string getTroopName(TroopType troopType) const;
 
-    sf::FloatRect getTroopCardBounds(int cardIndex) const;
+    sf::FloatRect getHandCardBounds(int handIndex) const;
+
+    sf::FloatRect getNextCardBounds() const;
 
     uint16_t getTroopMaxHp(TroopType troopType) const;
 

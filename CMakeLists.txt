@@ -22,5 +22,6 @@ add_executable(client
         client/main.cpp
         client/GameClient.cpp
         client/Renderer.cpp
+        client/Deck.cpp
 )
 target_link_libraries(client SFML::Graphics SFML::Network SFML::System SFML::Window)

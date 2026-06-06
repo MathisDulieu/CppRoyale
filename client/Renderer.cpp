@@ -23,7 +23,8 @@ void Renderer::render(const std::vector<EntitySnapshot> &entities,
                       bool gameOver,
                       uint8_t localPlayerId,
                       uint8_t winnerId,
-                      TroopType selectedTroop,
+                      const Deck &deck,
+                      int selectedHandIndex,
                       float elixir,
                       float remainingTime,
                       bool isOvertime) {
@@ -41,7 +42,8 @@ void Renderer::render(const std::vector<EntitySnapshot> &entities,
     drawTimer(remainingTime, isOvertime);
 
     if (!gameOver) {
-        drawTroopPanel(selectedTroop, elixir);
+        drawHandPanel(deck, selectedHandIndex, elixir);
+        drawNextCard(deck);
         drawElixirBar(elixir);
     }
 
@@ -68,7 +70,6 @@ void Renderer::drawTimer(float remainingTime, bool isOvertime) {
     std::string timerText = std::to_string(minutes) + ":"
                             + (seconds < 10 ? "0" : "")
                             + std::to_string(seconds);
-
     if (isOvertime)
         timerText = "OT " + timerText;
 
@@ -162,44 +163,18 @@ void Renderer::drawHpBar(const EntitySnapshot &snapshot, float renderY) {
     m_window.draw(fill);
 }
 
-void Renderer::drawElixirBar(float elixir) {
-    float barTotalWidth = 300.f;
-    float barHeight = 20.f;
-    float startX = (800.f - barTotalWidth) / 2.f;
-    float startY = 572.f;
-    float fillRatio = elixir / MAX_ELIXIR;
-
-    sf::RectangleShape background(sf::Vector2f(barTotalWidth, barHeight));
-    background.setPosition({startX, startY});
-    background.setFillColor(sf::Color(40, 10, 60));
-    m_window.draw(background);
-
-    sf::RectangleShape fill(sf::Vector2f(barTotalWidth * fillRatio, barHeight));
-    fill.setPosition({startX, startY});
-    fill.setFillColor(sf::Color(160, 40, 220));
-    m_window.draw(fill);
-
-    if (m_fontLoaded) {
-        std::string elixirText = std::to_string(static_cast<int>(elixir))
-                                 + " / "
-                                 + std::to_string(static_cast<int>(MAX_ELIXIR));
-        sf::Text label(m_font, elixirText, 13);
-        label.setFillColor(sf::Color::White);
-        label.setPosition({startX + barTotalWidth / 2.f - 20.f, startY + 2.f});
-        m_window.draw(label);
-    }
-}
-
-void Renderer::drawTroopPanel(TroopType selectedTroop, float elixir) {
+void Renderer::drawHandPanel(const Deck &deck,
+                             int selectedHandIndex,
+                             float elixir) {
     sf::RectangleShape panel(sf::Vector2f(800.f, UI_PANEL_HEIGHT));
     panel.setPosition({0.f, 600.f});
     panel.setFillColor(sf::Color(30, 30, 45));
     m_window.draw(panel);
 
-    for (int index = 0; index < TROOP_COUNT; ++index) {
-        TroopType troopType = static_cast<TroopType>(index);
-        sf::FloatRect bounds = getTroopCardBounds(index);
-        bool isSelected = (troopType == selectedTroop);
+    for (int index = 0; index < HAND_SIZE; ++index) {
+        TroopType troopType = deck.getCard(index);
+        sf::FloatRect bounds = getHandCardBounds(index);
+        bool isSelected = (index == selectedHandIndex);
         bool affordable = (elixir >= static_cast<float>(getTroopCost(troopType)));
 
         sf::RectangleShape card(sf::Vector2f(bounds.size.x, bounds.size.y));
@@ -229,6 +204,72 @@ void Renderer::drawTroopPanel(TroopType selectedTroop, float elixir) {
             });
             m_window.draw(costLabel);
         }
+    }
+}
+
+void Renderer::drawNextCard(const Deck &deck) {
+    sf::FloatRect bounds = getNextCardBounds();
+
+    sf::RectangleShape card(sf::Vector2f(bounds.size.x, bounds.size.y));
+    card.setPosition({bounds.position.x, bounds.position.y});
+    card.setFillColor(getTroopCardColor(deck.getNextCard(), false));
+    card.setOutlineThickness(1.f);
+    card.setOutlineColor(sf::Color(100, 100, 120));
+    m_window.draw(card);
+
+    if (m_fontLoaded) {
+        sf::Text nextLabel(m_font, "Next", 9);
+        nextLabel.setFillColor(sf::Color(180, 180, 180));
+        nextLabel.setPosition({
+            bounds.position.x + 4.f,
+            bounds.position.y - 14.f
+        });
+        m_window.draw(nextLabel);
+
+        sf::Text nameLabel(m_font, getTroopName(deck.getNextCard()), 9);
+        nameLabel.setFillColor(sf::Color(200, 200, 200));
+        nameLabel.setPosition({
+            bounds.position.x + 4.f,
+            bounds.position.y + 28.f
+        });
+        m_window.draw(nameLabel);
+
+        sf::Text costLabel(m_font,
+                           std::to_string(getTroopCost(deck.getNextCard())), 12);
+        costLabel.setFillColor(sf::Color(160, 80, 200));
+        costLabel.setPosition({
+            bounds.position.x + 4.f,
+            bounds.position.y + 4.f
+        });
+        m_window.draw(costLabel);
+    }
+}
+
+void Renderer::drawElixirBar(float elixir) {
+    float barTotalWidth = 300.f;
+    float barHeight = 20.f;
+    float startX = (800.f - barTotalWidth) / 2.f;
+    float startY = 572.f;
+    float fillRatio = elixir / MAX_ELIXIR;
+
+    sf::RectangleShape background(sf::Vector2f(barTotalWidth, barHeight));
+    background.setPosition({startX, startY});
+    background.setFillColor(sf::Color(40, 10, 60));
+    m_window.draw(background);
+
+    sf::RectangleShape fill(sf::Vector2f(barTotalWidth * fillRatio, barHeight));
+    fill.setPosition({startX, startY});
+    fill.setFillColor(sf::Color(160, 40, 220));
+    m_window.draw(fill);
+
+    if (m_fontLoaded) {
+        std::string elixirText = std::to_string(static_cast<int>(elixir))
+                                 + " / "
+                                 + std::to_string(static_cast<int>(MAX_ELIXIR));
+        sf::Text label(m_font, elixirText, 13);
+        label.setFillColor(sf::Color::White);
+        label.setPosition({startX + barTotalWidth / 2.f - 20.f, startY + 2.f});
+        m_window.draw(label);
     }
 }
 
@@ -318,14 +359,22 @@ std::string Renderer::getTroopName(TroopType troopType) const {
     }
 }
 
-sf::FloatRect Renderer::getTroopCardBounds(int cardIndex) const {
-    float totalWidth = TROOP_COUNT * TROOP_CARD_SIZE
-                       + (TROOP_COUNT - 1) * TROOP_CARD_GAP;
-    float startX = (800.f - totalWidth) / 2.f;
-    float x = startX + cardIndex * (TROOP_CARD_SIZE + TROOP_CARD_GAP);
+sf::FloatRect Renderer::getHandCardBounds(int handIndex) const {
+    float totalWidth = HAND_SIZE * TROOP_CARD_SIZE
+                       + (HAND_SIZE - 1) * TROOP_CARD_GAP;
+    float startX = (800.f - totalWidth) / 2.f - 30.f;
+    float x = startX + handIndex * (TROOP_CARD_SIZE + TROOP_CARD_GAP);
     float y = 600.f + (UI_PANEL_HEIGHT - TROOP_CARD_SIZE) / 2.f;
     return sf::FloatRect(sf::Vector2f(x, y),
                          sf::Vector2f(TROOP_CARD_SIZE, TROOP_CARD_SIZE));
+}
+
+sf::FloatRect Renderer::getNextCardBounds() const {
+    sf::FloatRect lastCard = getHandCardBounds(HAND_SIZE - 1);
+    float x = lastCard.position.x + TROOP_CARD_SIZE + 20.f;
+    float y = lastCard.position.y + (TROOP_CARD_SIZE - NEXT_CARD_SIZE) / 2.f;
+    return sf::FloatRect(sf::Vector2f(x, y),
+                         sf::Vector2f(NEXT_CARD_SIZE, NEXT_CARD_SIZE));
 }
 
 uint16_t Renderer::getTroopMaxHp(TroopType troopType) const {
@@ -356,14 +405,14 @@ uint8_t Renderer::getTroopCost(TroopType troopType) const {
     }
 }
 
-bool Renderer::isTroopCardClicked(const sf::Vector2i &mousePosition,
-                                  TroopType &outTroopType) const {
-    for (int index = 0; index < TROOP_COUNT; ++index) {
-        sf::FloatRect bounds = getTroopCardBounds(index);
+bool Renderer::isHandCardClicked(const sf::Vector2i &mousePosition,
+                                 int &outHandIndex) const {
+    for (int index = 0; index < HAND_SIZE; ++index) {
+        sf::FloatRect bounds = getHandCardBounds(index);
         sf::Vector2f mouse(static_cast<float>(mousePosition.x),
                            static_cast<float>(mousePosition.y));
         if (bounds.contains(mouse)) {
-            outTroopType = static_cast<TroopType>(index);
+            outHandIndex = index;
             return true;
         }
     }

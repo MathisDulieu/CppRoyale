@@ -26,7 +26,9 @@ public:
                 uint8_t localPlayerId,
                 uint8_t winnerId,
                 TroopType selectedTroop,
-                float elixir);
+                float elixir,
+                float remainingTime,
+                bool isOvertime);
 
     bool isTroopCardClicked(const sf::Vector2i &mousePosition,
                             TroopType &outTroopType) const;
@@ -50,9 +52,11 @@ private:
 
     void drawElixirBar(float elixir);
 
+    void drawTimer(float remainingTime, bool isOvertime);
+
     void drawWaitingScreen();
 
-    void drawGameOverScreen(bool localPlayerWon);
+    void drawGameOverScreen(bool localPlayerWon, bool isDraw);
 
     float getRenderY(float serverY, uint8_t localPlayerId) const;
 

@@ -24,7 +24,9 @@ void Renderer::render(const std::vector<EntitySnapshot> &entities,
                       uint8_t localPlayerId,
                       uint8_t winnerId,
                       TroopType selectedTroop,
-                      float elixir) {
+                      float elixir,
+                      float remainingTime,
+                      bool isOvertime) {
     m_window.clear(sf::Color(20, 20, 30));
 
     if (!gameStarted) {
@@ -36,6 +38,7 @@ void Renderer::render(const std::vector<EntitySnapshot> &entities,
     drawArena();
     drawTowers(towers, localPlayerId);
     drawEntities(entities, localPlayerId);
+    drawTimer(remainingTime, isOvertime);
 
     if (!gameOver) {
         drawTroopPanel(selectedTroop, elixir);
@@ -43,7 +46,7 @@ void Renderer::render(const std::vector<EntitySnapshot> &entities,
     }
 
     if (gameOver)
-        drawGameOverScreen(winnerId == localPlayerId);
+        drawGameOverScreen(winnerId == localPlayerId, winnerId == 255);
 
     m_window.display();
 }
@@ -53,6 +56,38 @@ void Renderer::drawArena() {
     midline.setPosition({0.f, 300.f});
     midline.setFillColor(sf::Color(80, 80, 80));
     m_window.draw(midline);
+}
+
+void Renderer::drawTimer(float remainingTime, bool isOvertime) {
+    if (!m_fontLoaded) return;
+
+    int totalSeconds = static_cast<int>(remainingTime);
+    int minutes = totalSeconds / 60;
+    int seconds = totalSeconds % 60;
+
+    std::string timerText = std::to_string(minutes) + ":"
+                            + (seconds < 10 ? "0" : "")
+                            + std::to_string(seconds);
+
+    if (isOvertime)
+        timerText = "OT " + timerText;
+
+    sf::Text timerLabel(m_font, timerText, 24);
+    timerLabel.setFillColor(isOvertime
+                                ? sf::Color(220, 60, 60)
+                                : sf::Color(220, 220, 220));
+
+    sf::FloatRect bounds = timerLabel.getLocalBounds();
+    timerLabel.setPosition({800.f - bounds.size.x - bounds.position.x - 8.f, 8.f});
+    m_window.draw(timerLabel);
+
+    if (isOvertime) {
+        sf::Text overtimeLabel(m_font, "OVERTIME", 12);
+        overtimeLabel.setFillColor(sf::Color(220, 60, 60));
+        sf::FloatRect otBounds = overtimeLabel.getLocalBounds();
+        overtimeLabel.setPosition({800.f - otBounds.size.x - otBounds.position.x - 8.f, 36.f});
+        m_window.draw(overtimeLabel);
+    }
 }
 
 void Renderer::drawTowers(const std::vector<TowerSnapshot> &towers,
@@ -186,8 +221,7 @@ void Renderer::drawTroopPanel(TroopType selectedTroop, float elixir) {
             m_window.draw(nameLabel);
 
             sf::Text costLabel(m_font,
-                               std::to_string(getTroopCost(troopType)),
-                               14);
+                               std::to_string(getTroopCost(troopType)), 14);
             costLabel.setFillColor(sf::Color(200, 100, 255));
             costLabel.setPosition({
                 bounds.position.x + 4.f,
@@ -205,25 +239,30 @@ void Renderer::drawWaitingScreen() {
     m_window.draw(waitingBox);
 }
 
-void Renderer::drawGameOverScreen(bool localPlayerWon) {
+void Renderer::drawGameOverScreen(bool localPlayerWon, bool isDraw) {
     sf::RectangleShape overlay(sf::Vector2f(800.f, 680.f));
     overlay.setFillColor(sf::Color(0, 0, 0, 160));
     m_window.draw(overlay);
 
+    sf::Color boxColor = isDraw
+                             ? sf::Color(80, 80, 80)
+                             : (localPlayerWon ? sf::Color(30, 120, 50) : sf::Color(120, 30, 30));
+
     sf::RectangleShape resultBox(sf::Vector2f(400.f, 120.f));
     resultBox.setPosition({200.f, 240.f});
-    resultBox.setFillColor(localPlayerWon
-                               ? sf::Color(30, 120, 50)
-                               : sf::Color(120, 30, 30));
+    resultBox.setFillColor(boxColor);
     m_window.draw(resultBox);
 
     if (m_fontLoaded) {
-        sf::Text resultText(m_font,
-                            localPlayerWon ? "Victory!" : "Defeat",
-                            48);
-        resultText.setFillColor(sf::Color::White);
-        resultText.setPosition({localPlayerWon ? 270.f : 300.f, 270.f});
-        m_window.draw(resultText);
+        std::string resultText = isDraw
+                                     ? "Draw"
+                                     : (localPlayerWon ? "Victory!" : "Defeat");
+
+        sf::Text label(m_font, resultText, 48);
+        label.setFillColor(sf::Color::White);
+        sf::FloatRect bounds = label.getLocalBounds();
+        label.setPosition({400.f - bounds.size.x / 2.f, 270.f});
+        m_window.draw(label);
     }
 }
 
@@ -251,9 +290,7 @@ sf::Color Renderer::getTowerColor(bool isNexus,
 }
 
 sf::Color Renderer::getTroopCardColor(TroopType troopType, bool affordable) const {
-    if (!affordable)
-        return sf::Color(50, 50, 50);
-
+    if (!affordable) return sf::Color(50, 50, 50);
     switch (troopType) {
         case TroopType::Goblin: return sf::Color(60, 140, 60);
         case TroopType::Giant: return sf::Color(100, 80, 160);
@@ -287,7 +324,6 @@ sf::FloatRect Renderer::getTroopCardBounds(int cardIndex) const {
     float startX = (800.f - totalWidth) / 2.f;
     float x = startX + cardIndex * (TROOP_CARD_SIZE + TROOP_CARD_GAP);
     float y = 600.f + (UI_PANEL_HEIGHT - TROOP_CARD_SIZE) / 2.f;
-
     return sf::FloatRect(sf::Vector2f(x, y),
                          sf::Vector2f(TROOP_CARD_SIZE, TROOP_CARD_SIZE));
 }

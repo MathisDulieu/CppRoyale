@@ -10,3 +10,6 @@ constexpr float ARENA_HEIGHT = 600.f;
 
 constexpr float MAX_ELIXIR = 10.f;
 constexpr float ELIXIR_REGEN_RATE = 1.f / 2.8f;
+
+constexpr float GAME_DURATION = 180.f;
+constexpr float OVERTIME_DURATION = 60.f;

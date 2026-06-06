@@ -47,11 +47,14 @@ int main() {
         uint8_t playerId = client.getPlayerId();
         uint8_t winnerId = client.getWinnerId();
         float elixir = client.getElixir();
+        float remainingTime = client.getRemainingTime();
+        bool isOvertime = client.isOvertime();
 
         renderer.render(client.getEntities(), client.getTowers(),
                         gameStarted, gameOver,
                         playerId, winnerId,
-                        selectedTroop, elixir);
+                        selectedTroop, elixir,
+                        remainingTime, isOvertime);
     }
 
     return 0;

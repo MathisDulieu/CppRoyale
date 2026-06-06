@@ -28,6 +28,8 @@ public:
     const std::vector<EntitySnapshot> &getEntities() const { return m_entities; }
     const std::vector<TowerSnapshot> &getTowers() const { return m_towers; }
     float getElixir() const { return m_elixir[m_playerId]; }
+    float getRemainingTime() const { return m_remainingTime; }
+    bool isOvertime() const { return m_isOvertime; }
 
 private:
     sf::TcpSocket m_socket;
@@ -37,4 +39,6 @@ private:
     std::vector<EntitySnapshot> m_entities;
     std::vector<TowerSnapshot> m_towers;
     std::array<float, MAX_PLAYERS> m_elixir = {5.f, 5.f};
+    float m_remainingTime = GAME_DURATION;
+    bool m_isOvertime = false;
 };

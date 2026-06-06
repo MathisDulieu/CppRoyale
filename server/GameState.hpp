@@ -12,7 +12,14 @@
 enum class GameResult {
     Ongoing,
     Player0Wins,
-    Player1Wins
+    Player1Wins,
+    Draw
+};
+
+enum class GamePhase {
+    Normal,
+    Overtime,
+    Ended
 };
 
 class GameState {
@@ -27,8 +34,12 @@ public:
     const std::vector<Tower> &getTowers() const { return m_towers; }
     uint32_t getTick() const { return m_tick; }
     GameResult getResult() const { return m_result; }
+    GamePhase getPhase() const { return m_phase; }
 
-    float getElixir(uint8_t playerId) const;
+    float getElixir(uint8_t id) const;
+
+    float getRemainingTime() const { return m_remainingTime; }
+    bool isOvertime() const { return m_phase == GamePhase::Overtime; }
 
 private:
     void initTowers();
@@ -42,6 +53,14 @@ private:
     void resolveTowerCombat();
 
     void checkWinCondition();
+
+    void updateTimer();
+
+    void resolveTimerEnd();
+    
+    uint16_t getLowestTowerHp(uint8_t ownerId) const;
+
+    int countDestroyedTowers(uint8_t ownerId) const;
 
     Tower *findClosestEnemyTower(float x, float y, uint8_t ownerId);
 
@@ -59,4 +78,6 @@ private:
     uint32_t m_tick;
     uint16_t m_nextEntityId;
     GameResult m_result;
+    GamePhase m_phase;
+    float m_remainingTime;
 };

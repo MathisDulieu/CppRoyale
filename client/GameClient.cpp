@@ -35,7 +35,9 @@ void GameClient::receivePackets() {
             std::cout << "[Client] Game started — player " << (int) m_playerId << "\n";
         } else if (packetType == PKT_GAME_STATE) {
             uint32_t tick;
-            packet >> tick;
+            uint8_t isOvertimeByte;
+            packet >> tick >> m_remainingTime >> isOvertimeByte;
+            m_isOvertime = (isOvertimeByte == 1);
 
             for (uint8_t playerId = 0; playerId < MAX_PLAYERS; ++playerId)
                 packet >> m_elixir[playerId];
@@ -76,7 +78,7 @@ void GameClient::receivePackets() {
             packet >> winnerId;
             m_winnerId = winnerId;
             m_state = ClientState::GameOver;
-            std::cout << "[Client] Game over — winner: player " << (int) winnerId << "\n";
+            std::cout << "[Client] Game over — winner: " << (int) winnerId << "\n";
         }
     }
 }

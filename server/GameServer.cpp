@@ -42,8 +42,12 @@ void GameServer::run() {
 
                 GameResult result = m_gameState.getResult();
                 if (result != GameResult::Ongoing) {
-                    uint8_t winnerId = (result == GameResult::Player0Wins) ? 0 : 1;
-                    broadcastGameOver(winnerId);
+                    if (result == GameResult::Draw) {
+                        broadcastGameOver(255);
+                    } else {
+                        uint8_t winnerId = (result == GameResult::Player0Wins) ? 0 : 1;
+                        broadcastGameOver(winnerId);
+                    }
                     m_serverState = ServerState::GameOver;
                 }
             }
@@ -106,38 +110,40 @@ void GameServer::broadcastStart() {
 }
 
 void GameServer::broadcastGameState() {
-    const auto &entities = m_gameState.getEntities();
-    const auto &towers = m_gameState.getTowers();
+    const auto& entities = m_gameState.getEntities();
+    const auto& towers   = m_gameState.getTowers();
 
     sf::Packet packet;
     packet << PKT_GAME_STATE;
     packet << m_gameState.getTick();
+    packet << m_gameState.getRemainingTime();
+    packet << static_cast<uint8_t>(m_gameState.isOvertime() ? 1 : 0);
 
     for (uint8_t playerId = 0; playerId < MAX_PLAYERS; ++playerId)
         packet << m_gameState.getElixir(playerId);
 
     packet << static_cast<uint16_t>(entities.size());
-    for (const auto &entity: entities) {
+    for (const auto& entity : entities) {
         packet << entity->getEntityId()
-                << static_cast<uint8_t>(entity->getTroopType())
-                << entity->getX()
-                << entity->getY()
-                << entity->getHp()
-                << entity->getOwnerId();
+               << static_cast<uint8_t>(entity->getTroopType())
+               << entity->getX()
+               << entity->getY()
+               << entity->getHp()
+               << entity->getOwnerId();
     }
 
     packet << static_cast<uint8_t>(towers.size());
-    for (const auto &tower: towers) {
+    for (const auto& tower : towers) {
         packet << tower.getTowerId()
-                << tower.getX()
-                << tower.getY()
-                << tower.getHp()
-                << tower.getOwnerId()
-                << static_cast<uint8_t>(tower.isNexus() ? 1 : 0);
+               << tower.getX()
+               << tower.getY()
+               << tower.getHp()
+               << tower.getOwnerId()
+               << static_cast<uint8_t>(tower.isNexus() ? 1 : 0);
     }
 
-    for (auto &slot: m_clients)
-        (void) slot.socket->send(packet);
+    for (auto& slot : m_clients)
+        (void)slot.socket->send(packet);
 }
 
 void GameServer::broadcastGameOver(uint8_t winnerPlayerId) {

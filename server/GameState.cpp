@@ -3,11 +3,14 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <iostream>
 
 GameState::GameState()
     : m_tick(0)
       , m_nextEntityId(1)
-      , m_result(GameResult::Ongoing) {
+      , m_result(GameResult::Ongoing)
+      , m_phase(GamePhase::Normal)
+      , m_remainingTime(GAME_DURATION) {
     m_elixir.fill(5.f);
     initTowers();
 }
@@ -39,6 +42,9 @@ bool GameState::spawnTroop(TroopType troopType,
 void GameState::update() {
     if (m_result != GameResult::Ongoing) return;
 
+    updateTimer();
+    if (m_result != GameResult::Ongoing) return;
+
     regenElixir();
     resolveCombat();
     resolveTowerCombat();
@@ -56,6 +62,74 @@ void GameState::update() {
 
     checkWinCondition();
     ++m_tick;
+}
+
+void GameState::updateTimer() {
+    m_remainingTime -= TICK_DURATION;
+
+    if (m_remainingTime <= 0.f) {
+        m_remainingTime = 0.f;
+        resolveTimerEnd();
+    }
+}
+
+void GameState::resolveTimerEnd() {
+    if (m_phase == GamePhase::Normal) {
+        int destroyed0 = countDestroyedTowers(1);
+        int destroyed1 = countDestroyedTowers(0);
+
+        std::cout << "[Server] Timer ended — towers destroyed: "
+                << "player0=" << destroyed0
+                << " player1=" << destroyed1 << "\n";
+
+        if (destroyed0 > destroyed1) {
+            m_result = GameResult::Player0Wins;
+            m_phase = GamePhase::Ended;
+        } else if (destroyed1 > destroyed0) {
+            m_result = GameResult::Player1Wins;
+            m_phase = GamePhase::Ended;
+        } else {
+            std::cout << "[Server] Equality — starting overtime\n";
+            m_phase = GamePhase::Overtime;
+            m_remainingTime = OVERTIME_DURATION;
+        }
+    } else if (m_phase == GamePhase::Overtime) {
+        uint16_t lowestHp0 = getLowestTowerHp(0);
+        uint16_t lowestHp1 = getLowestTowerHp(1);
+
+        std::cout << "[Server] Overtime ended — lowest tower HP: "
+                << "player0=" << lowestHp0
+                << " player1=" << lowestHp1 << "\n";
+
+        if (lowestHp0 < lowestHp1)
+            m_result = GameResult::Player1Wins;
+        else if (lowestHp1 < lowestHp0)
+            m_result = GameResult::Player0Wins;
+        else
+            m_result = GameResult::Draw;
+
+        m_phase = GamePhase::Ended;
+    }
+}
+
+uint16_t GameState::getLowestTowerHp(uint8_t ownerId) const {
+    uint16_t lowest = std::numeric_limits<uint16_t>::max();
+    for (const auto& tower : m_towers) {
+        if (tower.getOwnerId() != ownerId) continue;
+        if (!tower.isAlive()) return 0;
+        if (tower.getHp() < lowest)
+            lowest = tower.getHp();
+    }
+    return lowest;
+}
+
+int GameState::countDestroyedTowers(uint8_t ownerId) const {
+    int destroyed = 0;
+    for (const auto &tower: m_towers) {
+        if (tower.getOwnerId() == ownerId && !tower.isAlive())
+            ++destroyed;
+    }
+    return destroyed;
 }
 
 void GameState::regenElixir() {
@@ -181,8 +255,28 @@ void GameState::checkWinCondition() {
         if (tower.getOwnerId() == 1) player1NexusAlive = true;
     }
 
-    if (!player0NexusAlive) m_result = GameResult::Player1Wins;
-    if (!player1NexusAlive) m_result = GameResult::Player0Wins;
+    if (!player0NexusAlive) {
+        m_result = GameResult::Player1Wins;
+        return;
+    }
+    if (!player1NexusAlive) {
+        m_result = GameResult::Player0Wins;
+        return;
+    }
+
+    if (m_phase == GamePhase::Overtime) {
+        int destroyed0 = countDestroyedTowers(0);
+        int destroyed1 = countDestroyedTowers(1);
+
+        if (destroyed0 > 0) {
+            m_result = GameResult::Player1Wins;
+            return;
+        }
+        if (destroyed1 > 0) {
+            m_result = GameResult::Player0Wins;
+            return;
+        }
+    }
 }
 
 Tower *GameState::findClosestEnemyTower(float x, float y, uint8_t ownerId) {

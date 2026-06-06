@@ -15,15 +15,10 @@ constexpr float NEXT_CARD_SIZE = 44.f;
 
 class Renderer {
 public:
-    Renderer();
-
-    bool isOpen() const;
-
-    std::optional<sf::Event> pollEvent();
+    Renderer(sf::RenderWindow &window, sf::Font &font, bool fontLoaded);
 
     void render(const std::vector<EntitySnapshot> &entities,
                 const std::vector<TowerSnapshot> &towers,
-                bool gameStarted,
                 bool gameOver,
                 uint8_t localPlayerId,
                 uint8_t winnerId,
@@ -59,8 +54,6 @@ private:
 
     void drawTimer(float remainingTime, bool isOvertime);
 
-    void drawWaitingScreen();
-
     void drawGameOverScreen(bool localPlayerWon, bool isDraw);
 
     float getRenderY(float serverY, uint8_t localPlayerId) const;
@@ -83,7 +76,8 @@ private:
 
     uint8_t getTroopCost(TroopType troopType) const;
 
-    sf::RenderWindow m_window;
-    sf::Font m_font;
+    sf::RenderWindow &m_window;
+    sf::Font &m_font;
     bool m_fontLoaded;
+    uint8_t m_localPlayerId = 0;
 };

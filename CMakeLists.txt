@@ -15,6 +15,7 @@ add_executable(server
         server/GameState.cpp
         server/Entity.cpp
         server/Tower.cpp
+        server/Lobby.cpp
 )
 target_link_libraries(server SFML::Network SFML::System)
 
@@ -23,5 +24,6 @@ add_executable(client
         client/GameClient.cpp
         client/Renderer.cpp
         client/Deck.cpp
+        client/UIScreen.cpp
 )
 target_link_libraries(client SFML::Graphics SFML::Network SFML::System SFML::Window)

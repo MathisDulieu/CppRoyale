@@ -3,23 +3,14 @@
 #include <cmath>
 #include <string>
 
-Renderer::Renderer()
-    : m_window(sf::VideoMode({800, 680}), "CppRoyale")
-      , m_fontLoaded(false) {
-    m_window.setFramerateLimit(60);
-    if (m_font.openFromFile("C:/Windows/Fonts/arial.ttf"))
-        m_fontLoaded = true;
-}
-
-bool Renderer::isOpen() const { return m_window.isOpen(); }
-
-std::optional<sf::Event> Renderer::pollEvent() {
-    return m_window.pollEvent();
+Renderer::Renderer(sf::RenderWindow &window, sf::Font &font, bool fontLoaded)
+    : m_window(window)
+      , m_font(font)
+      , m_fontLoaded(fontLoaded) {
 }
 
 void Renderer::render(const std::vector<EntitySnapshot> &entities,
                       const std::vector<TowerSnapshot> &towers,
-                      bool gameStarted,
                       bool gameOver,
                       uint8_t localPlayerId,
                       uint8_t winnerId,
@@ -28,13 +19,7 @@ void Renderer::render(const std::vector<EntitySnapshot> &entities,
                       float elixir,
                       float remainingTime,
                       bool isOvertime) {
-    m_window.clear(sf::Color(20, 20, 30));
-
-    if (!gameStarted) {
-        drawWaitingScreen();
-        m_window.display();
-        return;
-    }
+    m_localPlayerId = localPlayerId;
 
     drawArena();
     drawTowers(towers, localPlayerId);
@@ -49,8 +34,6 @@ void Renderer::render(const std::vector<EntitySnapshot> &entities,
 
     if (gameOver)
         drawGameOverScreen(winnerId == localPlayerId, winnerId == 255);
-
-    m_window.display();
 }
 
 void Renderer::drawArena() {
@@ -70,14 +53,12 @@ void Renderer::drawTimer(float remainingTime, bool isOvertime) {
     std::string timerText = std::to_string(minutes) + ":"
                             + (seconds < 10 ? "0" : "")
                             + std::to_string(seconds);
-    if (isOvertime)
-        timerText = "OT " + timerText;
+    if (isOvertime) timerText = "OT " + timerText;
 
     sf::Text timerLabel(m_font, timerText, 24);
     timerLabel.setFillColor(isOvertime
                                 ? sf::Color(220, 60, 60)
                                 : sf::Color(220, 220, 220));
-
     sf::FloatRect bounds = timerLabel.getLocalBounds();
     timerLabel.setPosition({800.f - bounds.size.x - bounds.position.x - 8.f, 8.f});
     m_window.draw(timerLabel);
@@ -163,9 +144,7 @@ void Renderer::drawHpBar(const EntitySnapshot &snapshot, float renderY) {
     m_window.draw(fill);
 }
 
-void Renderer::drawHandPanel(const Deck &deck,
-                             int selectedHandIndex,
-                             float elixir) {
+void Renderer::drawHandPanel(const Deck &deck, int selectedHandIndex, float elixir) {
     sf::RectangleShape panel(sf::Vector2f(800.f, UI_PANEL_HEIGHT));
     panel.setPosition({0.f, 600.f});
     panel.setFillColor(sf::Color(30, 30, 45));
@@ -220,27 +199,18 @@ void Renderer::drawNextCard(const Deck &deck) {
     if (m_fontLoaded) {
         sf::Text nextLabel(m_font, "Next", 9);
         nextLabel.setFillColor(sf::Color(180, 180, 180));
-        nextLabel.setPosition({
-            bounds.position.x + 4.f,
-            bounds.position.y - 14.f
-        });
+        nextLabel.setPosition({bounds.position.x + 4.f, bounds.position.y - 14.f});
         m_window.draw(nextLabel);
 
         sf::Text nameLabel(m_font, getTroopName(deck.getNextCard()), 9);
         nameLabel.setFillColor(sf::Color(200, 200, 200));
-        nameLabel.setPosition({
-            bounds.position.x + 4.f,
-            bounds.position.y + 28.f
-        });
+        nameLabel.setPosition({bounds.position.x + 4.f, bounds.position.y + 28.f});
         m_window.draw(nameLabel);
 
         sf::Text costLabel(m_font,
                            std::to_string(getTroopCost(deck.getNextCard())), 12);
         costLabel.setFillColor(sf::Color(160, 80, 200));
-        costLabel.setPosition({
-            bounds.position.x + 4.f,
-            bounds.position.y + 4.f
-        });
+        costLabel.setPosition({bounds.position.x + 4.f, bounds.position.y + 4.f});
         m_window.draw(costLabel);
     }
 }
@@ -273,13 +243,6 @@ void Renderer::drawElixirBar(float elixir) {
     }
 }
 
-void Renderer::drawWaitingScreen() {
-    sf::RectangleShape waitingBox(sf::Vector2f(300.f, 80.f));
-    waitingBox.setPosition({250.f, 260.f});
-    waitingBox.setFillColor(sf::Color(200, 140, 30));
-    m_window.draw(waitingBox);
-}
-
 void Renderer::drawGameOverScreen(bool localPlayerWon, bool isDraw) {
     sf::RectangleShape overlay(sf::Vector2f(800.f, 680.f));
     overlay.setFillColor(sf::Color(0, 0, 0, 160));
@@ -298,7 +261,6 @@ void Renderer::drawGameOverScreen(bool localPlayerWon, bool isDraw) {
         std::string resultText = isDraw
                                      ? "Draw"
                                      : (localPlayerWon ? "Victory!" : "Defeat");
-
         sf::Text label(m_font, resultText, 48);
         label.setFillColor(sf::Color::White);
         sf::FloatRect bounds = label.getLocalBounds();

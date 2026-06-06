@@ -2,17 +2,13 @@
 #include <SFML/Network.hpp>
 #include <vector>
 #include <memory>
+#include "ClientSession.hpp"
+#include "Lobby.hpp"
 #include "GameState.hpp"
 
-enum class ServerState {
-    Waiting,
-    Playing,
-    GameOver
-};
-
-struct ClientSlot {
-    std::unique_ptr<sf::TcpSocket> socket;
-    uint8_t playerId;
+struct ActiveGame {
+    GameState gameState;
+    uint8_t clientIds[2];
 };
 
 class GameServer {
@@ -26,20 +22,49 @@ private:
 
     void receivePackets();
 
-    void broadcastStart();
+    void removeDisconnectedClients();
 
-    void broadcastGameState();
+    void processPacket(sf::Packet &packet, ClientSession &session);
 
-    void broadcastGameOver(uint8_t winnerPlayerId);
+    void handleSetName(sf::Packet &packet, ClientSession &session);
 
-    void processDeployPacket(sf::Packet &packet, uint8_t playerId);
+    void handleFindMatch(ClientSession &session);
+
+    void handleCancelMatch(ClientSession &session);
+
+    void handlePlayerListRequest(ClientSession &session);
+
+    void handleChallenge(sf::Packet &packet, ClientSession &session);
+
+    void handleChallengeResponse(sf::Packet &packet, ClientSession &session);
+
+    void handleCancelChallenge(ClientSession &session);
+
+    void handleDeploy(sf::Packet &packet, ClientSession &session);
+
+    void handleReturnToLobby(ClientSession &session);
+
+    void startGame(uint8_t clientId0, uint8_t clientId1);
+
+    void broadcastMatchFound(uint8_t clientId0, uint8_t clientId1);
+
+    void broadcastGameState(ActiveGame &game);
+
+    void broadcastGameOver(ActiveGame &game, uint8_t winnerPlayerId);
+
+    void broadcastPlayerList();
+
+    void sendPlayerList(ClientSession &session);
+
+    ClientSession *findSession(uint8_t clientId);
+
+    ActiveGame *findGame(uint8_t clientId);
 
     sf::TcpListener m_listener;
     sf::SocketSelector m_selector;
-    std::vector<ClientSlot> m_clients;
-    ServerState m_serverState;
-    GameState m_gameState;
+    std::vector<ClientSession> m_sessions;
+    std::vector<ActiveGame> m_activeGames;
+    Lobby m_lobby;
     bool m_running;
-    bool m_startPending;
-    int m_startPendingTicks;
+    uint8_t m_nextClientId;
 };

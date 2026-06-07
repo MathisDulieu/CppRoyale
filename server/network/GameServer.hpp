@@ -3,8 +3,8 @@
 #include <vector>
 #include <memory>
 #include "ClientSession.hpp"
-#include "Lobby.hpp"
-#include "GameState.hpp"
+#include "../lobby/Lobby.hpp"
+#include "../game/GameState.hpp"
 
 struct ActiveGame {
     GameState gameState;

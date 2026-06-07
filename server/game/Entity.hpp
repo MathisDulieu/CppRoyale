@@ -1,6 +1,6 @@
 #pragma once
 #include <cstdint>
-#include "TroopType.hpp"
+#include "../../shared/TroopType.hpp"
 
 class Entity {
 public:

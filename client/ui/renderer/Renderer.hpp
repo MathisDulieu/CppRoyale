@@ -1,11 +1,11 @@
 #pragma once
 #include <SFML/Graphics.hpp>
 #include <vector>
-#include <optional>
+#include <string>
 #include <cstdint>
-#include "Packets.hpp"
-#include "TroopType.hpp"
-#include "Deck.hpp"
+#include "../../../shared/Packets.hpp"
+#include "../../../shared/TroopType.hpp"
+#include "../../game/Deck.hpp"
 
 constexpr int TROOP_COUNT = 4;
 constexpr float UI_PANEL_HEIGHT = 80.f;
@@ -28,14 +28,14 @@ public:
                 float remainingTime,
                 bool isOvertime);
 
+    void drawSpectatorOverlay(const std::string &topName,
+                              const std::string &bottomName,
+                              uint8_t spectatorCount);
+
     bool isHandCardClicked(const sf::Vector2i &mousePosition,
                            int &outHandIndex) const;
 
     bool isArenaClicked(const sf::Vector2i &mousePosition) const;
-
-    void drawSpectatorOverlay(const std::string &topName,
-                              const std::string &bottomName,
-                              uint8_t spectatorCount);
 
 private:
     void drawArena();
@@ -84,6 +84,4 @@ private:
     sf::Font &m_font;
     bool m_fontLoaded;
     uint8_t m_localPlayerId = 0;
-    std::string m_player0Name;
-    std::string m_player1Name;
 };

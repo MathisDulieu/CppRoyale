@@ -32,26 +32,18 @@ void Entity::move(float deltaX, float deltaY) {
 }
 
 void Entity::takeDamage(uint16_t damage) {
-    if (damage >= m_hp)
-        m_hp = 0;
-    else
-        m_hp -= damage;
+    if (damage >= m_hp) m_hp = 0;
+    else m_hp -= damage;
 }
 
-void Entity::setInCombat(bool inCombat) {
-    m_inCombat = inCombat;
-}
+void Entity::setInCombat(bool inCombat) { m_inCombat = inCombat; }
 
 void Entity::reduceCooldown(float delta) {
-    if (m_cooldownTimer > 0.f)
-        m_cooldownTimer -= delta;
-    if (m_cooldownTimer < 0.f)
-        m_cooldownTimer = 0.f;
+    if (m_cooldownTimer > 0.f) m_cooldownTimer -= delta;
+    if (m_cooldownTimer < 0.f) m_cooldownTimer = 0.f;
 }
 
-void Entity::resetCooldown() {
-    m_cooldownTimer = m_attackCooldown;
-}
+void Entity::resetCooldown() { m_cooldownTimer = m_attackCooldown; }
 
 float Entity::getBaseSpeed(TroopType troopType) const {
     switch (troopType) {

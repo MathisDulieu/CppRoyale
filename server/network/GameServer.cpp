@@ -1,6 +1,6 @@
 #include "GameServer.hpp"
-#include "Packets.hpp"
-#include "Constants.hpp"
+#include "../../shared/Packets.hpp"
+#include "../../shared/Constants.hpp"
 #include <iostream>
 #include <algorithm>
 
@@ -98,7 +98,6 @@ void GameServer::removeDisconnectedClients() {
         if (!session.disconnected) continue;
 
         std::cout << "[Server] Client disconnected: " << session.name << "\n";
-
         bool hadName = session.hasSetName;
 
         if (session.state == SessionState::Searching)
@@ -128,10 +127,10 @@ void GameServer::removeDisconnectedClients() {
         if (session.state == SessionState::InGame) {
             ActiveGame *game = findGame(session.clientId);
             if (game) {
-                uint8_t survivorClientId = (game->clientIds[0] == session.clientId)
-                                               ? game->clientIds[1]
-                                               : game->clientIds[0];
-                ClientSession *survivor = findSession(survivorClientId);
+                uint8_t survivorId = (game->clientIds[0] == session.clientId)
+                                         ? game->clientIds[1]
+                                         : game->clientIds[0];
+                ClientSession *survivor = findSession(survivorId);
                 if (survivor) {
                     sf::Packet gameOverPacket;
                     gameOverPacket << PKT_GAME_OVER << survivor->gamePlayerId;
@@ -171,8 +170,7 @@ void GameServer::removeDisconnectedClients() {
         m_sessions.end()
     );
 
-    if (anyRemoved)
-        broadcastPlayerList();
+    if (anyRemoved) broadcastPlayerList();
 }
 
 void GameServer::processPacket(sf::Packet &packet, ClientSession &session) {
@@ -267,8 +265,7 @@ void GameServer::handleChallenge(sf::Packet &packet, ClientSession &session) {
     if (targetId == session.clientId) return;
 
     ClientSession *target = findSession(targetId);
-    if (!target) return;
-    if (target->state != SessionState::Idle) return;
+    if (!target || target->state != SessionState::Idle) return;
 
     session.state = SessionState::ChallengeSent;
     session.challengePartnerId = targetId;
@@ -288,11 +285,10 @@ void GameServer::handleChallengeResponse(sf::Packet &packet,
                                          ClientSession &session) {
     if (session.state != SessionState::ChallengeReceived) return;
 
-    uint8_t accepted;
-    packet >> accepted;
-
+    uint8_t accepted = 0;
     uint8_t challengerId = session.challengePartnerId;
     ClientSession *challenger = findSession(challengerId);
+    packet >> accepted;
     session.challengePartnerId = 255;
 
     if (accepted == 1) {
@@ -366,9 +362,7 @@ void GameServer::handleSpectate(sf::Packet &packet, ClientSession &session) {
     game->spectatorIds.push_back(session.clientId);
 
     sf::Packet infoPacket;
-    infoPacket << PKT_SPECTATE
-            << game->clientIds[0]
-            << game->clientIds[1];
+    infoPacket << PKT_SPECTATE << game->clientIds[0] << game->clientIds[1];
     (void) session.socket->send(infoPacket);
 
     sf::Packet statePacket;
@@ -403,7 +397,6 @@ void GameServer::handleSpectate(sf::Packet &packet, ClientSession &session) {
     }
 
     (void) session.socket->send(statePacket);
-
     broadcastSpectatorCount(*game);
     broadcastPlayerList();
 
@@ -501,14 +494,12 @@ void GameServer::broadcastGameState(ActiveGame &game) {
 
     for (uint8_t clientId: game.clientIds) {
         ClientSession *session = findSession(clientId);
-        if (session)
-            (void) session->socket->send(packet);
+        if (session) (void) session->socket->send(packet);
     }
 
     for (uint8_t spectatorId: game.spectatorIds) {
         ClientSession *spectator = findSession(spectatorId);
-        if (spectator)
-            (void) spectator->socket->send(packet);
+        if (spectator) (void) spectator->socket->send(packet);
     }
 }
 
@@ -547,14 +538,12 @@ void GameServer::broadcastSpectatorCount(ActiveGame &game) {
 
     for (uint8_t clientId: game.clientIds) {
         ClientSession *session = findSession(clientId);
-        if (session)
-            (void) session->socket->send(packet);
+        if (session) (void) session->socket->send(packet);
     }
 
     for (uint8_t spectatorId: game.spectatorIds) {
         ClientSession *spectator = findSession(spectatorId);
-        if (spectator)
-            (void) spectator->socket->send(packet);
+        if (spectator) (void) spectator->socket->send(packet);
     }
 }
 

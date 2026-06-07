@@ -1,4 +1,4 @@
-#include "Renderer.hpp"
+#include "./Renderer.hpp"
 #include "Constants.hpp"
 #include <cmath>
 #include <string>
@@ -6,10 +6,7 @@
 Renderer::Renderer(sf::RenderWindow &window, sf::Font &font, bool fontLoaded)
     : m_window(window)
       , m_font(font)
-      , m_fontLoaded(fontLoaded)
-      , m_localPlayerId(0)
-      , m_player0Name("")
-      , m_player1Name("") {
+      , m_fontLoaded(fontLoaded) {
 }
 
 void Renderer::render(const std::vector<EntitySnapshot> &entities,

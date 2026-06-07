@@ -13,7 +13,6 @@ public:
             "Lazy", "Hyper", "Funky", "Gloomy", "Bouncy",
             "Chunky", "Dizzy", "Fuzzy", "Jumpy", "Nerdy"
         };
-
         static const std::vector<std::string> nouns = {
             "Goblin", "Panda", "Wizard", "Banana", "Ninja",
             "Potato", "Dragon", "Penguin", "Cactus", "Noodle",
@@ -25,7 +24,6 @@ public:
             std::chrono::steady_clock::now().time_since_epoch().count()
         );
         std::default_random_engine rng(seed);
-
         std::uniform_int_distribution<int> adjDist(0, adjectives.size() - 1);
         std::uniform_int_distribution<int> nounDist(0, nouns.size() - 1);
         std::uniform_int_distribution<int> numDist(10, 9999);

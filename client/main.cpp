@@ -1,8 +1,8 @@
-#include "GameClient.hpp"
-#include "Renderer.hpp"
-#include "Deck.hpp"
-#include "UIScreen.hpp"
-#include "NameGenerator.hpp"
+#include "network/GameClient.hpp"
+#include "ui/renderer/Renderer.hpp"
+#include "game/Deck.hpp"
+#include "ui/screens/UIScreen.hpp"
+#include "ui/NameGenerator.hpp"
 #include "Constants.hpp"
 #include <SFML/Graphics.hpp>
 

@@ -1,7 +1,7 @@
 #pragma once
 #include <array>
 #include <vector>
-#include "TroopType.hpp"
+#include "../../shared/TroopType.hpp"
 
 constexpr int DECK_SIZE = 8;
 constexpr int HAND_SIZE = 4;
@@ -17,10 +17,6 @@ public:
     int getHandSize() const { return HAND_SIZE; }
 
 private:
-    void shuffle();
-
-    void drawFromReserve();
-
     std::array<TroopType, HAND_SIZE> m_hand;
     std::vector<TroopType> m_reserve;
 };

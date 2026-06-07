@@ -5,14 +5,9 @@
 
 Deck::Deck() {
     std::vector<TroopType> allTroops = {
-        TroopType::Goblin,
-        TroopType::Giant,
-        TroopType::Archer,
-        TroopType::Knight,
-        TroopType::Bomber,
-        TroopType::Dragon,
-        TroopType::Golem,
-        TroopType::Wizard
+        TroopType::Goblin, TroopType::Giant, TroopType::Archer,
+        TroopType::Knight, TroopType::Bomber, TroopType::Dragon,
+        TroopType::Golem, TroopType::Wizard
     };
 
     unsigned seed = static_cast<unsigned>(
@@ -30,12 +25,7 @@ Deck::Deck() {
 
 void Deck::playCard(int handIndex) {
     TroopType playedCard = m_hand[handIndex];
-    drawFromReserve();
-    m_hand[handIndex] = m_reserve.empty() ? playedCard : m_reserve.front();
-    if (!m_reserve.empty())
-        m_reserve.erase(m_reserve.begin());
+    m_hand[handIndex] = m_reserve.front();
+    m_reserve.erase(m_reserve.begin());
     m_reserve.push_back(playedCard);
-}
-
-void Deck::drawFromReserve() {
 }

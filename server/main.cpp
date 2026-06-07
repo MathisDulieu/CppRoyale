@@ -1,5 +1,5 @@
-#include "GameServer.hpp"
-#include "Constants.hpp"
+#include "network/GameServer.hpp"
+#include "../shared/Constants.hpp"
 
 int main() {
     GameServer server(SERVER_PORT);

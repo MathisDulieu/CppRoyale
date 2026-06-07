@@ -19,19 +19,13 @@ Tower::Tower(uint8_t towerId,
 }
 
 void Tower::takeDamage(uint16_t damage) {
-    if (damage >= m_hp)
-        m_hp = 0;
-    else
-        m_hp -= damage;
+    if (damage >= m_hp) m_hp = 0;
+    else m_hp -= damage;
 }
 
 void Tower::reduceCooldown(float delta) {
-    if (m_cooldownTimer > 0.f)
-        m_cooldownTimer -= delta;
-    if (m_cooldownTimer < 0.f)
-        m_cooldownTimer = 0.f;
+    if (m_cooldownTimer > 0.f) m_cooldownTimer -= delta;
+    if (m_cooldownTimer < 0.f) m_cooldownTimer = 0.f;
 }
 
-void Tower::resetCooldown() {
-    m_cooldownTimer = m_attackCooldown;
-}
+void Tower::resetCooldown() { m_cooldownTimer = m_attackCooldown; }

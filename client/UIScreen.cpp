@@ -1,5 +1,6 @@
 #include "UIScreen.hpp"
 #include <cmath>
+#include <string>
 
 UIScreen::UIScreen(sf::RenderWindow &window, sf::Font &font, bool fontLoaded)
     : m_window(window)
@@ -49,6 +50,11 @@ UIScreen::UIScreen(sf::RenderWindow &window, sf::Font &font, bool fontLoaded)
         sf::FloatRect({300.f, 420.f}, {200.f, 55.f}),
         "Back to lobby",
         sf::Color(60, 80, 160), sf::Color(80, 100, 200)
+    };
+    m_spectateLeaveButton = {
+        sf::FloatRect({300.f, 615.f}, {200.f, 50.f}),
+        "Leave spectate",
+        sf::Color(160, 50, 50), sf::Color(200, 70, 70)
     };
 }
 
@@ -184,14 +190,17 @@ void UIScreen::drawIdle(const std::string &playerName,
     int globalIndex = 0;
     int visibleIndex = 0;
     for (const auto &player: playerList) {
-        if (player.clientId == localClientId) continue;
+        if (player.clientId == localClientId) {
+            ++globalIndex;
+            continue;
+        }
 
-        if (globalIndex >= m_playerListScrollOffset
-            && visibleIndex < VISIBLE_ROWS) {
+        if (globalIndex >= m_playerListScrollOffset && visibleIndex < VISIBLE_ROWS) {
             float rowY = LIST_START_Y + visibleIndex * ROW_HEIGHT;
 
             std::string statusText;
             if (player.isInGame) statusText = " [In game]";
+            else if (player.isSpectating) statusText = " [Spectating]";
             else if (player.isSearching) statusText = " [Searching]";
             else statusText = " [Idle]";
 
@@ -200,18 +209,33 @@ void UIScreen::drawIdle(const std::string &playerName,
 
             bool canChallenge = !player.isSearching
                                 && !player.isInGame
+                                && !player.isSpectating
                                 && !player.hasPendingChallenge;
 
             if (canChallenge) {
-                sf::FloatRect challengeBounds = getChallengeButtonBounds(visibleIndex);
-                sf::RectangleShape challengeBtn(challengeBounds.size);
-                challengeBtn.setPosition(challengeBounds.position);
-                challengeBtn.setFillColor(sf::Color(100, 60, 160));
-                challengeBtn.setOutlineThickness(1.f);
-                challengeBtn.setOutlineColor(sf::Color(140, 80, 220));
-                m_window.draw(challengeBtn);
-                drawText("Challenge", challengeBounds.position.x + 6.f,
-                         challengeBounds.position.y + 8.f, 13, sf::Color::White);
+                sf::FloatRect cb = getChallengeButtonBounds(visibleIndex);
+                sf::RectangleShape btn(cb.size);
+                btn.setPosition(cb.position);
+                btn.setFillColor(sf::Color(100, 60, 160));
+                btn.setOutlineThickness(1.f);
+                btn.setOutlineColor(sf::Color(140, 80, 220));
+                m_window.draw(btn);
+                drawText("Challenge", cb.position.x + 6.f,
+                         cb.position.y + 8.f, 13, sf::Color::White);
+            }
+
+            if (player.isInGame
+                && player.gamePlayer0Id != 255
+                && player.gamePlayer1Id != 255) {
+                sf::FloatRect wb = getWatchButtonBounds(visibleIndex);
+                sf::RectangleShape btn(wb.size);
+                btn.setPosition(wb.position);
+                btn.setFillColor(sf::Color(40, 100, 160));
+                btn.setOutlineThickness(1.f);
+                btn.setOutlineColor(sf::Color(60, 140, 220));
+                m_window.draw(btn);
+                drawText("Watch", wb.position.x + 6.f,
+                         wb.position.y + 8.f, 13, sf::Color::White);
             }
 
             ++visibleIndex;
@@ -279,32 +303,65 @@ void UIScreen::drawMatchFound(const std::string &opponentName, float timer) {
                      355.f, 18, sf::Color(160, 160, 160));
 }
 
-void UIScreen::drawGameOver(bool localPlayerWon, bool isDraw) {
+void UIScreen::drawGameOver(bool localPlayerWon,
+                            bool isDraw,
+                            bool isSpectator,
+                            const std::string &player0Name,
+                            const std::string &player1Name,
+                            uint8_t winnerId) {
     sf::RectangleShape overlay(sf::Vector2f(800.f, 680.f));
     overlay.setFillColor(sf::Color(0, 0, 0, 160));
     m_window.draw(overlay);
 
     sf::Color boxColor = isDraw
                              ? sf::Color(80, 80, 80)
-                             : (localPlayerWon ? sf::Color(30, 120, 50) : sf::Color(120, 30, 30));
+                             : (isSpectator
+                                    ? sf::Color(60, 60, 100)
+                                    : (localPlayerWon ? sf::Color(30, 120, 50) : sf::Color(120, 30, 30)));
 
-    sf::RectangleShape resultBox(sf::Vector2f(400.f, 180.f));
-    resultBox.setPosition({200.f, 220.f});
+    sf::RectangleShape resultBox(sf::Vector2f(400.f, 200.f));
+    resultBox.setPosition({200.f, 200.f});
     resultBox.setFillColor(boxColor);
     m_window.draw(resultBox);
 
     if (m_fontLoaded) {
-        std::string resultText = isDraw
-                                     ? "Draw"
-                                     : (localPlayerWon ? "Victory!" : "Defeat");
-        sf::Text label(m_font, resultText, 48);
+        std::string resultText;
+        if (isDraw) {
+            resultText = "Draw";
+        } else if (isSpectator) {
+            std::string winnerName = (winnerId == 0) ? player0Name : player1Name;
+            resultText = winnerName + " wins!";
+        } else {
+            resultText = localPlayerWon ? "Victory!" : "Defeat";
+        }
+
+        sf::Text label(m_font, resultText, 38);
         label.setFillColor(sf::Color::White);
         sf::FloatRect bounds = label.getLocalBounds();
-        label.setPosition({400.f - bounds.size.x / 2.f, 240.f});
+        label.setPosition({400.f - bounds.size.x / 2.f, 220.f});
         m_window.draw(label);
+
+        if (isSpectator && !isDraw) {
+            std::string loserName = (winnerId == 0) ? player1Name : player0Name;
+            sf::Text detailLabel(m_font, "vs " + loserName, 18);
+            detailLabel.setFillColor(sf::Color(180, 180, 180));
+            sf::FloatRect db = detailLabel.getLocalBounds();
+            detailLabel.setPosition({400.f - db.size.x / 2.f, 270.f});
+            m_window.draw(detailLabel);
+        }
     }
 
     drawButton(m_returnToLobbyButton);
+}
+
+void UIScreen::drawSpectatorCount(uint8_t count) {
+    if (!m_fontLoaded || count == 0) return;
+    std::string text = "Watching: " + std::to_string(count);
+    drawText(text, 10.f, 10.f, 16, sf::Color(180, 220, 255));
+}
+
+void UIScreen::scrollPlayerList(int delta) {
+    m_playerListScrollOffset = std::max(0, m_playerListScrollOffset + delta);
 }
 
 void UIScreen::updateHover(sf::Vector2i mouse) {
@@ -319,6 +376,7 @@ void UIScreen::updateHover(sf::Vector2i mouse) {
     m_acceptChallengeButton.hovered = m_acceptChallengeButton.bounds.contains(mouseF);
     m_declineChallengeButton.hovered = m_declineChallengeButton.bounds.contains(mouseF);
     m_returnToLobbyButton.hovered = m_returnToLobbyButton.bounds.contains(mouseF);
+    m_spectateLeaveButton.hovered = m_spectateLeaveButton.bounds.contains(mouseF);
 }
 
 bool UIScreen::isConfirmNameClicked(sf::Vector2i mouse) const {
@@ -366,12 +424,15 @@ bool UIScreen::isReturnToLobbyClicked(sf::Vector2i mouse) const {
         sf::Vector2f(static_cast<float>(mouse.x), static_cast<float>(mouse.y)));
 }
 
-bool UIScreen::isChallengeClicked(sf::Vector2i mouse,
-                                  uint8_t &outTargetId,
+bool UIScreen::isSpectateLeaveClicked(sf::Vector2i mouse) const {
+    return m_spectateLeaveButton.bounds.contains(
+        sf::Vector2f(static_cast<float>(mouse.x), static_cast<float>(mouse.y)));
+}
+
+bool UIScreen::isChallengeClicked(sf::Vector2i mouse, uint8_t &outTargetId,
                                   const std::vector<PlayerInfo> &playerList,
                                   uint8_t localClientId) const {
     sf::Vector2f mouseF(static_cast<float>(mouse.x), static_cast<float>(mouse.y));
-
     constexpr int VISIBLE_ROWS = 6;
     int globalIndex = 0;
     int visibleIndex = 0;
@@ -385,6 +446,7 @@ bool UIScreen::isChallengeClicked(sf::Vector2i mouse,
         if (globalIndex >= m_playerListScrollOffset && visibleIndex < VISIBLE_ROWS) {
             bool canChallenge = !player.isSearching
                                 && !player.isInGame
+                                && !player.isSpectating
                                 && !player.hasPendingChallenge;
             if (canChallenge) {
                 sf::FloatRect bounds = getChallengeButtonBounds(visibleIndex);
@@ -400,11 +462,71 @@ bool UIScreen::isChallengeClicked(sf::Vector2i mouse,
     return false;
 }
 
-sf::FloatRect UIScreen::getChallengeButtonBounds(int rowIndex) const {
-    float rowY = 190.f + rowIndex * 56.f;
-    return sf::FloatRect(sf::Vector2f(530.f, rowY), sf::Vector2f(100.f, 34.f));
+bool UIScreen::isWatchClicked(sf::Vector2i mouse, uint8_t &outPlayer0Id,
+                              uint8_t &outPlayer1Id,
+                              const std::vector<PlayerInfo> &playerList,
+                              uint8_t localClientId) const {
+    sf::Vector2f mouseF(static_cast<float>(mouse.x), static_cast<float>(mouse.y));
+    constexpr int VISIBLE_ROWS = 6;
+    int globalIndex = 0;
+    int visibleIndex = 0;
+
+    for (const auto &player: playerList) {
+        if (player.clientId == localClientId) {
+            ++globalIndex;
+            continue;
+        }
+
+        if (globalIndex >= m_playerListScrollOffset && visibleIndex < VISIBLE_ROWS) {
+            if (player.isInGame
+                && player.gamePlayer0Id != 255
+                && player.gamePlayer1Id != 255) {
+                sf::FloatRect bounds = getWatchButtonBounds(visibleIndex);
+                if (bounds.contains(mouseF)) {
+                    outPlayer0Id = player.clientId;
+                    outPlayer1Id = (player.gamePlayer0Id == player.clientId)
+                                       ? player.gamePlayer1Id
+                                       : player.gamePlayer0Id;
+                    return true;
+                }
+            }
+            ++visibleIndex;
+        }
+        ++globalIndex;
+    }
+    return false;
 }
 
-void UIScreen::scrollPlayerList(int delta) {
-    m_playerListScrollOffset = std::max(0, m_playerListScrollOffset + delta);
+sf::FloatRect UIScreen::getChallengeButtonBounds(int rowIndex) const {
+    float rowY = 190.f + rowIndex * 56.f;
+    return sf::FloatRect(sf::Vector2f(480.f, rowY), sf::Vector2f(80.f, 34.f));
+}
+
+sf::FloatRect UIScreen::getWatchButtonBounds(int rowIndex) const {
+    float rowY = 190.f + rowIndex * 56.f;
+    return sf::FloatRect(sf::Vector2f(565.f, rowY), sf::Vector2f(70.f, 34.f));
+}
+
+void UIScreen::drawSpectateLeavePanel() {
+    sf::RectangleShape panel(sf::Vector2f(800.f, 80.f));
+    panel.setPosition({0.f, 600.f});
+    panel.setFillColor(sf::Color(30, 30, 45));
+    m_window.draw(panel);
+
+    sf::RectangleShape leaveBtn(sf::Vector2f(200.f, 50.f));
+    leaveBtn.setPosition({300.f, 615.f});
+    leaveBtn.setFillColor(m_spectateLeaveButton.hovered
+                              ? sf::Color(200, 70, 70)
+                              : sf::Color(160, 50, 50));
+    leaveBtn.setOutlineThickness(2.f);
+    leaveBtn.setOutlineColor(sf::Color(220, 80, 80));
+    m_window.draw(leaveBtn);
+
+    if (m_fontLoaded) {
+        sf::Text label(m_font, "Leave spectate", 16);
+        label.setFillColor(sf::Color::White);
+        sf::FloatRect bounds = label.getLocalBounds();
+        label.setPosition({400.f - bounds.size.x / 2.f, 628.f});
+        m_window.draw(label);
+    }
 }

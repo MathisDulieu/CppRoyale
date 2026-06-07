@@ -17,6 +17,9 @@ constexpr uint8_t PKT_CHALLENGE_RESP = 0x0C;
 constexpr uint8_t PKT_MATCH_FOUND = 0x0D;
 constexpr uint8_t PKT_CANCEL_CHALLENGE = 0x0E;
 constexpr uint8_t PKT_RETURN_TO_LOBBY = 0x0F;
+constexpr uint8_t PKT_SPECTATE = 0x10;
+constexpr uint8_t PKT_SPECTATE_LEAVE = 0x11;
+constexpr uint8_t PKT_SPECTATE_COUNT = 0x12;
 
 constexpr uint16_t MAX_ENTITIES = 64;
 constexpr uint8_t MAX_NAME_LENGTH = 32;
@@ -45,4 +48,7 @@ struct PlayerInfo {
     bool isSearching;
     bool hasPendingChallenge;
     bool isInGame;
+    bool isSpectating;
+    uint8_t gamePlayer0Id;
+    uint8_t gamePlayer1Id;
 };

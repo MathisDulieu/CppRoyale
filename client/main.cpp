@@ -89,10 +89,16 @@ int main() {
                     }
                 } else if (showPlayerList) {
                     uint8_t targetId;
+                    uint8_t watchP0, watchP1;
                     if (ui.isChallengeClicked(mouse, targetId,
                                               client.getPlayerList(),
                                               client.getClientId())) {
                         client.sendChallenge(targetId);
+                        showPlayerList = false;
+                    } else if (ui.isWatchClicked(mouse, watchP0, watchP1,
+                                                 client.getPlayerList(),
+                                                 client.getClientId())) {
+                        client.sendSpectate(watchP0, watchP1);
                         showPlayerList = false;
                     } else {
                         showPlayerList = false;
@@ -122,6 +128,11 @@ int main() {
                     client.sendChallengeResponse(true);
                 else if (ui.isDeclineChallengeClicked(mouse))
                     client.sendChallengeResponse(false);
+            } else if (state == ClientState::Spectating) {
+                if (ui.isSpectateLeaveClicked(mouse)) {
+                    client.sendSpectateLeave();
+                    showPlayerList = false;
+                }
             } else if (state == ClientState::GameOver) {
                 if (ui.isReturnToLobbyClicked(mouse)) {
                     client.sendReturnToLobby();
@@ -164,7 +175,8 @@ int main() {
         ClientState state = client.getState();
 
         if (state == ClientState::EnteringName) {
-            ui.drawNameEntry(currentNameInput, cursorVisible, client.getNameError());
+            ui.drawNameEntry(currentNameInput, cursorVisible,
+                             client.getNameError());
         } else if (state == ClientState::Idle) {
             ui.drawIdle(client.getName(), showPlayerList,
                         client.getPlayerList(), client.getClientId());
@@ -179,6 +191,27 @@ int main() {
         } else if (state == ClientState::MatchFound) {
             ui.drawMatchFound(client.getOpponentName(),
                               client.getMatchFoundTimer());
+        } else if (state == ClientState::Spectating) {
+            bool watchedIsPlayer0 = (client.getWatchedPlayerId()
+                                     == client.getGamePlayer0Id());
+
+            std::string topName = watchedIsPlayer0
+                                      ? client.getPlayer1Name()
+                                      : client.getPlayer0Name();
+            std::string bottomName = watchedIsPlayer0
+                                         ? client.getPlayer0Name()
+                                         : client.getPlayer1Name();
+
+            uint8_t spectatorViewPlayerId = watchedIsPlayer0 ? 0 : 1;
+
+            renderer.render(client.getEntities(), client.getTowers(),
+                            false, spectatorViewPlayerId, 255,
+                            deck, 0, 0.f,
+                            client.getRemainingTime(),
+                            client.isOvertime());
+            renderer.drawSpectatorOverlay(topName, bottomName,
+                                          client.getSpectatorCount());
+            ui.drawSpectateLeavePanel();
         } else if (state == ClientState::Playing) {
             renderer.render(client.getEntities(), client.getTowers(),
                             false,
@@ -187,16 +220,44 @@ int main() {
                             client.getElixir(),
                             client.getRemainingTime(),
                             client.isOvertime());
+            renderer.drawSpectatorOverlay(client.getOpponentName(),
+                                          client.getName(),
+                                          client.getSpectatorCount());
         } else if (state == ClientState::GameOver) {
+            bool wasSpectator = client.wasSpectating();
+            bool watchedIsPlayer0 = wasSpectator
+                                    && (client.getWatchedPlayerId() == client.getGamePlayer0Id());
+
+            std::string topName = wasSpectator
+                                      ? (watchedIsPlayer0
+                                             ? client.getPlayer1Name()
+                                             : client.getPlayer0Name())
+                                      : client.getOpponentName();
+            std::string bottomName = wasSpectator
+                                         ? (watchedIsPlayer0
+                                                ? client.getPlayer0Name()
+                                                : client.getPlayer1Name())
+                                         : client.getName();
+
+            uint8_t viewPlayerId = wasSpectator
+                                       ? (watchedIsPlayer0 ? 0 : 1)
+                                       : client.getPlayerId();
+
             renderer.render(client.getEntities(), client.getTowers(),
                             true,
-                            client.getPlayerId(), client.getWinnerId(),
+                            viewPlayerId,
+                            client.getWinnerId(),
                             deck, selectedHandIndex,
-                            client.getElixir(),
+                            wasSpectator ? 0.f : client.getElixir(),
                             client.getRemainingTime(),
                             client.isOvertime());
+            renderer.drawSpectatorOverlay(topName, bottomName, 0);
             ui.drawGameOver(client.getWinnerId() == client.getPlayerId(),
-                            client.getWinnerId() == 255);
+                            client.getWinnerId() == 255,
+                            wasSpectator,
+                            client.getPlayer0Name(),
+                            client.getPlayer1Name(),
+                            client.getWinnerId());
         }
 
         window.display();

@@ -21,10 +21,10 @@ bool GameClient::connect(const std::string &host, unsigned short port) {
     return true;
 }
 
-void GameClient::sendName(const std::string& name) {
+void GameClient::sendName(const std::string &name) {
     sf::Packet packet;
     packet << PKT_SET_NAME << name;
-    (void)m_socket.send(packet);
+    (void) m_socket.send(packet);
     m_name = name;
 }
 
@@ -53,7 +53,7 @@ void GameClient::sendChallengeResponse(bool accepted) {
     sf::Packet packet;
     packet << PKT_CHALLENGE_RESP << static_cast<uint8_t>(accepted ? 1 : 0);
     (void) m_socket.send(packet);
-    m_state = accepted ? ClientState::Idle : ClientState::Idle;
+    m_state = ClientState::Idle;
 }
 
 void GameClient::sendCancelChallenge() {
@@ -85,6 +85,37 @@ void GameClient::sendReturnToLobby() {
     (void) m_socket.send(packet);
     m_state = ClientState::Idle;
     m_winnerId = 255;
+    m_wasSpectating = false;
+    m_spectatorCount = 0;
+    m_entities.clear();
+    m_towers.clear();
+}
+
+void GameClient::sendSpectate(uint8_t player0Id, uint8_t player1Id) {
+    sf::Packet packet;
+    packet << PKT_SPECTATE << player0Id << player1Id;
+    (void) m_socket.send(packet);
+    m_state = ClientState::Spectating;
+    m_wasSpectating = true;
+    m_spectatorCount = 0;
+    m_winnerId = 255;
+    m_isLocalPlayer0 = false;
+    m_watchedPlayerId = player0Id;
+    m_gamePlayer0Id = player0Id;
+    m_gamePlayer1Id = player1Id;
+
+    for (const auto &player: m_playerList) {
+        if (player.clientId == player0Id) m_player0Name = player.name;
+        if (player.clientId == player1Id) m_player1Name = player.name;
+    }
+}
+
+void GameClient::sendSpectateLeave() {
+    sf::Packet packet;
+    packet << PKT_SPECTATE_LEAVE;
+    (void) m_socket.send(packet);
+    m_state = ClientState::Idle;
+    m_spectatorCount = 0;
     m_entities.clear();
     m_towers.clear();
 }
@@ -104,7 +135,21 @@ void GameClient::receivePackets() {
         uint8_t packetType;
         packet >> packetType;
 
-        if (packetType == PKT_MATCH_FOUND) {
+        if (packetType == PKT_SET_NAME) {
+            uint8_t success;
+            packet >> success;
+            if (success == 1) {
+                uint8_t assignedId;
+                packet >> assignedId;
+                m_clientId = assignedId;
+                m_nameError = "";
+                m_state = ClientState::Idle;
+            } else {
+                std::string errorMsg;
+                packet >> errorMsg;
+                m_nameError = errorMsg;
+            }
+        } else if (packetType == PKT_MATCH_FOUND) {
             uint8_t assignedPlayerId;
             std::string opponentName;
             packet >> assignedPlayerId >> opponentName;
@@ -112,14 +157,15 @@ void GameClient::receivePackets() {
             m_opponentName = opponentName;
             m_state = ClientState::MatchFound;
             m_matchFoundTimer = 3.f;
+            m_isLocalPlayer0 = (assignedPlayerId == 0);
         } else if (packetType == PKT_GAME_STATE) {
             uint32_t tick;
             uint8_t isOvertimeByte;
             packet >> tick >> m_remainingTime >> isOvertimeByte;
             m_isOvertime = (isOvertimeByte == 1);
 
-            for (uint8_t playerId = 0; playerId < MAX_PLAYERS; ++playerId)
-                packet >> m_elixir[playerId];
+            for (uint8_t i = 0; i < MAX_PLAYERS; ++i)
+                packet >> m_elixir[i];
 
             uint16_t entityCount;
             packet >> entityCount;
@@ -163,17 +209,19 @@ void GameClient::receivePackets() {
             m_playerList.clear();
             for (uint8_t index = 0; index < playerCount; ++index) {
                 PlayerInfo info;
-                uint8_t isSearching;
-                uint8_t hasPending;
-                uint8_t isInGame;
+                uint8_t isSearching, hasPending, isInGame, isSpectating;
                 packet >> info.clientId
                         >> info.name
                         >> isSearching
                         >> hasPending
-                        >> isInGame;
+                        >> isInGame
+                        >> isSpectating
+                        >> info.gamePlayer0Id
+                        >> info.gamePlayer1Id;
                 info.isSearching = (isSearching == 1);
                 info.hasPendingChallenge = (hasPending == 1);
                 info.isInGame = (isInGame == 1);
+                info.isSpectating = (isSpectating == 1);
                 m_playerList.push_back(info);
             }
         } else if (packetType == PKT_CHALLENGE) {
@@ -190,19 +238,17 @@ void GameClient::receivePackets() {
         } else if (packetType == PKT_CANCEL_CHALLENGE) {
             m_state = ClientState::Idle;
             m_challengerName = "";
-        } else if (packetType == PKT_SET_NAME) {
-            uint8_t success;
-            packet >> success;
-            if (success == 1) {
-                uint8_t assignedId;
-                packet >> assignedId;
-                m_clientId = assignedId;
-                m_nameError = "";
-                m_state = ClientState::Idle;
-            } else {
-                std::string errorMsg;
-                packet >> errorMsg;
-                m_nameError = errorMsg;
+        } else if (packetType == PKT_SPECTATE_COUNT) {
+            packet >> m_spectatorCount;
+        } else if (packetType == PKT_SPECTATE) {
+            uint8_t realPlayer0Id, realPlayer1Id;
+            packet >> realPlayer0Id >> realPlayer1Id;
+            m_gamePlayer0Id = realPlayer0Id;
+            m_gamePlayer1Id = realPlayer1Id;
+
+            for (const auto &player: m_playerList) {
+                if (player.clientId == realPlayer0Id) m_player0Name = player.name;
+                if (player.clientId == realPlayer1Id) m_player1Name = player.name;
             }
         }
     }

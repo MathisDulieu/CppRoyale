@@ -10,7 +10,8 @@ enum class SessionState {
     ChallengeSent,
     ChallengeReceived,
     InGame,
-    GameOver
+    GameOver,
+    Spectating
 };
 
 struct ClientSession {

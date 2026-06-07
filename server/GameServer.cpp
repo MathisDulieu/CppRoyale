@@ -116,6 +116,15 @@ void GameServer::removeDisconnectedClients() {
             }
         }
 
+        if (session.state == SessionState::Spectating) {
+            for (auto &game: m_activeGames) {
+                auto &ids = game.spectatorIds;
+                ids.erase(std::remove(ids.begin(), ids.end(), session.clientId),
+                          ids.end());
+                broadcastSpectatorCount(game);
+            }
+        }
+
         if (session.state == SessionState::InGame) {
             ActiveGame *game = findGame(session.clientId);
             if (game) {
@@ -127,9 +136,20 @@ void GameServer::removeDisconnectedClients() {
                     sf::Packet gameOverPacket;
                     gameOverPacket << PKT_GAME_OVER << survivor->gamePlayerId;
                     (void) survivor->socket->send(gameOverPacket);
-                    survivor->state = SessionState::Idle;
+                    survivor->state = SessionState::GameOver;
                     survivor->gamePlayerId = 255;
                 }
+
+                for (uint8_t spectatorId: game->spectatorIds) {
+                    ClientSession *spectator = findSession(spectatorId);
+                    if (spectator) {
+                        sf::Packet gameOverPacket;
+                        gameOverPacket << PKT_GAME_OVER << uint8_t(255);
+                        (void) spectator->socket->send(gameOverPacket);
+                        spectator->state = SessionState::Idle;
+                    }
+                }
+
                 m_activeGames.erase(
                     std::remove_if(m_activeGames.begin(), m_activeGames.end(),
                                    [&session](const ActiveGame &g) {
@@ -178,6 +198,10 @@ void GameServer::processPacket(sf::Packet &packet, ClientSession &session) {
             break;
         case PKT_RETURN_TO_LOBBY: handleReturnToLobby(session);
             break;
+        case PKT_SPECTATE: handleSpectate(packet, session);
+            break;
+        case PKT_SPECTATE_LEAVE: handleSpectateLeave(session);
+            break;
         default: break;
     }
 }
@@ -192,7 +216,8 @@ void GameServer::handleSetName(sf::Packet &packet, ClientSession &session) {
         if (!other.hasSetName) continue;
         if (other.name == name) {
             sf::Packet rejectPacket;
-            rejectPacket << PKT_SET_NAME << uint8_t(0) << std::string("Name already taken");
+            rejectPacket << PKT_SET_NAME << uint8_t(0)
+                    << std::string("Name already taken");
             (void) session.socket->send(rejectPacket);
             return;
         }
@@ -200,6 +225,7 @@ void GameServer::handleSetName(sf::Packet &packet, ClientSession &session) {
 
     session.name = name;
     session.hasSetName = true;
+
     sf::Packet confirmPacket;
     confirmPacket << PKT_SET_NAME << uint8_t(1) << session.clientId;
     (void) session.socket->send(confirmPacket);
@@ -238,7 +264,6 @@ void GameServer::handleChallenge(sf::Packet &packet, ClientSession &session) {
 
     uint8_t targetId;
     packet >> targetId;
-
     if (targetId == session.clientId) return;
 
     ClientSession *target = findSession(targetId);
@@ -268,7 +293,6 @@ void GameServer::handleChallengeResponse(sf::Packet &packet,
 
     uint8_t challengerId = session.challengePartnerId;
     ClientSession *challenger = findSession(challengerId);
-
     session.challengePartnerId = 255;
 
     if (accepted == 1) {
@@ -314,7 +338,6 @@ void GameServer::handleDeploy(sf::Packet &packet, ClientSession &session) {
     float x;
     float y;
     uint8_t senderPlayerId;
-
     packet >> troopTypeByte >> x >> y >> senderPlayerId;
     if (senderPlayerId != session.gamePlayerId) return;
 
@@ -328,6 +351,81 @@ void GameServer::handleReturnToLobby(ClientSession &session) {
     session.state = SessionState::Idle;
     session.gamePlayerId = 255;
     broadcastPlayerList();
+}
+
+void GameServer::handleSpectate(sf::Packet &packet, ClientSession &session) {
+    if (session.state != SessionState::Idle) return;
+
+    uint8_t player0Id, player1Id;
+    packet >> player0Id >> player1Id;
+
+    ActiveGame *game = findGameByPlayers(player0Id, player1Id);
+    if (!game) return;
+
+    session.state = SessionState::Spectating;
+    game->spectatorIds.push_back(session.clientId);
+
+    sf::Packet infoPacket;
+    infoPacket << PKT_SPECTATE
+            << game->clientIds[0]
+            << game->clientIds[1];
+    (void) session.socket->send(infoPacket);
+
+    sf::Packet statePacket;
+    statePacket << PKT_GAME_STATE;
+    statePacket << game->gameState.getTick();
+    statePacket << game->gameState.getRemainingTime();
+    statePacket << static_cast<uint8_t>(game->gameState.isOvertime() ? 1 : 0);
+
+    for (uint8_t i = 0; i < MAX_PLAYERS; ++i)
+        statePacket << game->gameState.getElixir(i);
+
+    const auto &entities = game->gameState.getEntities();
+    statePacket << static_cast<uint16_t>(entities.size());
+    for (const auto &entity: entities) {
+        statePacket << entity->getEntityId()
+                << static_cast<uint8_t>(entity->getTroopType())
+                << entity->getX()
+                << entity->getY()
+                << entity->getHp()
+                << entity->getOwnerId();
+    }
+
+    const auto &towers = game->gameState.getTowers();
+    statePacket << static_cast<uint8_t>(towers.size());
+    for (const auto &tower: towers) {
+        statePacket << tower.getTowerId()
+                << tower.getX()
+                << tower.getY()
+                << tower.getHp()
+                << tower.getOwnerId()
+                << static_cast<uint8_t>(tower.isNexus() ? 1 : 0);
+    }
+
+    (void) session.socket->send(statePacket);
+
+    broadcastSpectatorCount(*game);
+    broadcastPlayerList();
+
+    std::cout << "[Server] " << session.name << " is spectating\n";
+}
+
+void GameServer::handleSpectateLeave(ClientSession &session) {
+    if (session.state != SessionState::Spectating) return;
+
+    for (auto &game: m_activeGames) {
+        auto &ids = game.spectatorIds;
+        auto it = std::find(ids.begin(), ids.end(), session.clientId);
+        if (it != ids.end()) {
+            ids.erase(it);
+            broadcastSpectatorCount(game);
+            break;
+        }
+    }
+
+    session.state = SessionState::Idle;
+    broadcastPlayerList();
+    std::cout << "[Server] " << session.name << " left spectating\n";
 }
 
 void GameServer::startGame(uint8_t clientId0, uint8_t clientId1) {
@@ -378,8 +476,8 @@ void GameServer::broadcastGameState(ActiveGame &game) {
     packet << game.gameState.getRemainingTime();
     packet << static_cast<uint8_t>(game.gameState.isOvertime() ? 1 : 0);
 
-    for (uint8_t playerId = 0; playerId < MAX_PLAYERS; ++playerId)
-        packet << game.gameState.getElixir(playerId);
+    for (uint8_t i = 0; i < MAX_PLAYERS; ++i)
+        packet << game.gameState.getElixir(i);
 
     packet << static_cast<uint16_t>(entities.size());
     for (const auto &entity: entities) {
@@ -406,6 +504,12 @@ void GameServer::broadcastGameState(ActiveGame &game) {
         if (session)
             (void) session->socket->send(packet);
     }
+
+    for (uint8_t spectatorId: game.spectatorIds) {
+        ClientSession *spectator = findSession(spectatorId);
+        if (spectator)
+            (void) spectator->socket->send(packet);
+    }
 }
 
 void GameServer::broadcastGameOver(ActiveGame &game, uint8_t winnerPlayerId) {
@@ -420,7 +524,38 @@ void GameServer::broadcastGameOver(ActiveGame &game, uint8_t winnerPlayerId) {
             session->gamePlayerId = 255;
         }
     }
+
+    sf::Packet spectatorPacket;
+    spectatorPacket << PKT_GAME_OVER << winnerPlayerId;
+
+    for (uint8_t spectatorId: game.spectatorIds) {
+        ClientSession *spectator = findSession(spectatorId);
+        if (spectator) {
+            (void) spectator->socket->send(spectatorPacket);
+            spectator->state = SessionState::GameOver;
+        }
+    }
+
     broadcastPlayerList();
+}
+
+void GameServer::broadcastSpectatorCount(ActiveGame &game) {
+    uint8_t count = static_cast<uint8_t>(game.spectatorIds.size());
+
+    sf::Packet packet;
+    packet << PKT_SPECTATE_COUNT << count;
+
+    for (uint8_t clientId: game.clientIds) {
+        ClientSession *session = findSession(clientId);
+        if (session)
+            (void) session->socket->send(packet);
+    }
+
+    for (uint8_t spectatorId: game.spectatorIds) {
+        ClientSession *spectator = findSession(spectatorId);
+        if (spectator)
+            (void) spectator->socket->send(packet);
+    }
 }
 
 void GameServer::broadcastPlayerList() {
@@ -441,14 +576,34 @@ void GameServer::sendPlayerList(ClientSession &receiver) {
     for (const auto &session: m_sessions) {
         if (session.clientId == receiver.clientId) continue;
         if (!session.hasSetName) continue;
+
         bool hasPending = (session.state == SessionState::ChallengeReceived);
         bool isUnavailable = (session.state == SessionState::InGame
                               || session.state == SessionState::GameOver);
+        bool isSpectating = (session.state == SessionState::Spectating);
+
+        uint8_t gamePlayer0Id = 255;
+        uint8_t gamePlayer1Id = 255;
+
+        if (isUnavailable) {
+            for (const auto &game: m_activeGames) {
+                if (game.clientIds[0] == session.clientId
+                    || game.clientIds[1] == session.clientId) {
+                    gamePlayer0Id = game.clientIds[0];
+                    gamePlayer1Id = game.clientIds[1];
+                    break;
+                }
+            }
+        }
+
         packet << session.clientId
                 << session.name
                 << static_cast<uint8_t>(session.state == SessionState::Searching ? 1 : 0)
                 << static_cast<uint8_t>(hasPending ? 1 : 0)
-                << static_cast<uint8_t>(isUnavailable ? 1 : 0);
+                << static_cast<uint8_t>(isUnavailable ? 1 : 0)
+                << static_cast<uint8_t>(isSpectating ? 1 : 0)
+                << gamePlayer0Id
+                << gamePlayer1Id;
     }
 
     (void) receiver.socket->send(packet);
@@ -465,5 +620,14 @@ ActiveGame *GameServer::findGame(uint8_t clientId) {
     for (auto &game: m_activeGames)
         if (game.clientIds[0] == clientId || game.clientIds[1] == clientId)
             return &game;
+    return nullptr;
+}
+
+ActiveGame *GameServer::findGameByPlayers(uint8_t clientId0, uint8_t clientId1) {
+    for (auto &game: m_activeGames) {
+        if ((game.clientIds[0] == clientId0 && game.clientIds[1] == clientId1)
+            || (game.clientIds[0] == clientId1 && game.clientIds[1] == clientId0))
+            return &game;
+    }
     return nullptr;
 }

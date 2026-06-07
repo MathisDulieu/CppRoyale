@@ -16,12 +16,10 @@ class UIScreen {
 public:
     UIScreen(sf::RenderWindow &window, sf::Font &font, bool fontLoaded);
 
-    void drawNameEntry(const std::string &currentName,
-                       bool cursorVisible,
+    void drawNameEntry(const std::string &currentName, bool cursorVisible,
                        const std::string &errorMessage);
 
-    void drawIdle(const std::string &playerName,
-                  bool showPlayerList,
+    void drawIdle(const std::string &playerName, bool showPlayerList,
                   const std::vector<PlayerInfo> &playerList,
                   uint8_t localClientId);
 
@@ -33,7 +31,14 @@ public:
 
     void drawMatchFound(const std::string &opponentName, float timer);
 
-    void drawGameOver(bool localPlayerWon, bool isDraw);
+    void drawGameOver(bool localPlayerWon,
+                      bool isDraw,
+                      bool isSpectator,
+                      const std::string &player0Name = "",
+                      const std::string &player1Name = "",
+                      uint8_t winnerId = 255);
+
+    void drawSpectatorCount(uint8_t count);
 
     bool isConfirmNameClicked(sf::Vector2i mouse) const;
 
@@ -53,14 +58,22 @@ public:
 
     bool isReturnToLobbyClicked(sf::Vector2i mouse) const;
 
-    bool isChallengeClicked(sf::Vector2i mouse,
-                            uint8_t &outTargetId,
+    bool isSpectateLeaveClicked(sf::Vector2i mouse) const;
+
+    bool isChallengeClicked(sf::Vector2i mouse, uint8_t &outTargetId,
                             const std::vector<PlayerInfo> &playerList,
                             uint8_t localClientId) const;
 
-    void updateHover(sf::Vector2i mouse);
+    bool isWatchClicked(sf::Vector2i mouse, uint8_t &outPlayer0Id,
+                        uint8_t &outPlayer1Id,
+                        const std::vector<PlayerInfo> &playerList,
+                        uint8_t localClientId) const;
 
     void scrollPlayerList(int delta);
+
+    void updateHover(sf::Vector2i mouse);
+
+    void drawSpectateLeavePanel();
 
 private:
     void drawButton(const UIButton &button);
@@ -72,6 +85,8 @@ private:
                           unsigned int size, sf::Color color);
 
     sf::FloatRect getChallengeButtonBounds(int rowIndex) const;
+
+    sf::FloatRect getWatchButtonBounds(int rowIndex) const;
 
     sf::RenderWindow &m_window;
     sf::Font &m_font;
@@ -87,4 +102,5 @@ private:
     UIButton m_acceptChallengeButton;
     UIButton m_declineChallengeButton;
     UIButton m_returnToLobbyButton;
+    UIButton m_spectateLeaveButton;
 };

@@ -9,6 +9,7 @@
 struct ActiveGame {
     GameState gameState;
     uint8_t clientIds[2];
+    std::vector<uint8_t> spectatorIds;
 };
 
 class GameServer {
@@ -44,6 +45,10 @@ private:
 
     void handleReturnToLobby(ClientSession &session);
 
+    void handleSpectate(sf::Packet &packet, ClientSession &session);
+
+    void handleSpectateLeave(ClientSession &session);
+
     void startGame(uint8_t clientId0, uint8_t clientId1);
 
     void broadcastMatchFound(uint8_t clientId0, uint8_t clientId1);
@@ -52,6 +57,8 @@ private:
 
     void broadcastGameOver(ActiveGame &game, uint8_t winnerPlayerId);
 
+    void broadcastSpectatorCount(ActiveGame &game);
+
     void broadcastPlayerList();
 
     void sendPlayerList(ClientSession &session);
@@ -59,6 +66,8 @@ private:
     ClientSession *findSession(uint8_t clientId);
 
     ActiveGame *findGame(uint8_t clientId);
+
+    ActiveGame *findGameByPlayers(uint8_t clientId0, uint8_t clientId1);
 
     sf::TcpListener m_listener;
     sf::SocketSelector m_selector;

@@ -6,7 +6,10 @@
 Renderer::Renderer(sf::RenderWindow &window, sf::Font &font, bool fontLoaded)
     : m_window(window)
       , m_font(font)
-      , m_fontLoaded(fontLoaded) {
+      , m_fontLoaded(fontLoaded)
+      , m_localPlayerId(0)
+      , m_player0Name("")
+      , m_player1Name("") {
 }
 
 void Renderer::render(const std::vector<EntitySnapshot> &entities,
@@ -20,19 +23,20 @@ void Renderer::render(const std::vector<EntitySnapshot> &entities,
                       float remainingTime,
                       bool isOvertime) {
     m_localPlayerId = localPlayerId;
+    bool isSpectator = (localPlayerId == 255);
 
     drawArena();
-    drawTowers(towers, localPlayerId);
-    drawEntities(entities, localPlayerId);
+    drawTowers(towers, isSpectator ? 1 : localPlayerId);
+    drawEntities(entities, isSpectator ? 1 : localPlayerId);
     drawTimer(remainingTime, isOvertime);
 
-    if (!gameOver) {
+    if (!isSpectator && !gameOver) {
         drawHandPanel(deck, selectedHandIndex, elixir);
         drawNextCard(deck);
         drawElixirBar(elixir);
     }
 
-    if (gameOver)
+    if (gameOver && !isSpectator)
         drawGameOverScreen(winnerId == localPlayerId, winnerId == 255);
 }
 
@@ -383,4 +387,36 @@ bool Renderer::isHandCardClicked(const sf::Vector2i &mousePosition,
 
 bool Renderer::isArenaClicked(const sf::Vector2i &mousePosition) const {
     return mousePosition.y < 600;
+}
+
+void Renderer::drawSpectatorOverlay(const std::string &topName,
+                                    const std::string &bottomName,
+                                    uint8_t spectatorCount) {
+    if (!m_fontLoaded) return;
+
+    sf::RectangleShape topBadge(sf::Vector2f(160.f, 26.f));
+    topBadge.setPosition({10.f, 40.f});
+    topBadge.setFillColor(sf::Color(30, 30, 50, 200));
+    m_window.draw(topBadge);
+    sf::Text topLabel(m_font, topName, 14);
+    topLabel.setFillColor(sf::Color(255, 180, 180));
+    topLabel.setPosition({14.f, 44.f});
+    m_window.draw(topLabel);
+
+    sf::RectangleShape bottomBadge(sf::Vector2f(160.f, 26.f));
+    bottomBadge.setPosition({10.f, 560.f});
+    bottomBadge.setFillColor(sf::Color(30, 30, 50, 200));
+    m_window.draw(bottomBadge);
+    sf::Text bottomLabel(m_font, bottomName, 14);
+    bottomLabel.setFillColor(sf::Color(180, 200, 255));
+    bottomLabel.setPosition({14.f, 564.f});
+    m_window.draw(bottomLabel);
+
+    if (spectatorCount > 0) {
+        sf::Text countLabel(m_font,
+                            "Watching: " + std::to_string(spectatorCount), 14);
+        countLabel.setFillColor(sf::Color(180, 220, 255));
+        countLabel.setPosition({10.f, 10.f});
+        m_window.draw(countLabel);
+    }
 }

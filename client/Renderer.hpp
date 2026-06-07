@@ -33,6 +33,10 @@ public:
 
     bool isArenaClicked(const sf::Vector2i &mousePosition) const;
 
+    void drawSpectatorOverlay(const std::string &topName,
+                              const std::string &bottomName,
+                              uint8_t spectatorCount);
+
 private:
     void drawArena();
 
@@ -80,4 +84,6 @@ private:
     sf::Font &m_font;
     bool m_fontLoaded;
     uint8_t m_localPlayerId = 0;
+    std::string m_player0Name;
+    std::string m_player1Name;
 };
